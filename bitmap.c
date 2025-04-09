@@ -25,6 +25,13 @@ typedef struct /**** BMP file info structure ****/
     unsigned int biClrImportant; /* Number of important colors */
 } BMPINFOHEADER;
 
+typedef struct /**** Pixel info structure ****/
+{
+    unsigned int R; /* Red value of pixel (0-255)*/
+    unsigned int G; /* Green value of pixel (0-255)*/
+    unsigned int B; /* Blue value of pixel (0-255)*/
+} PIXEL;
+
 void leituraHeader(FILE *F, BMPFILEHEADER *H) {
     /*F é o arquivo Bitmap que deve ter sido “lido” do disco*/
     fread(&H->bfType,sizeof (unsigned short int),1,F);
@@ -60,13 +67,13 @@ int main(void) {
     info->biSize, info->biWidth, info->biHeight, info->biPlanes, info->biBitCount,
     info->biCompression, info->biSizeImage, info->biXPelsPerMeter, info->biYPelsPerMeter,
     info->biClrUsed, info->biClrImportant);
-    int r, g, b;
+    PIXEL *pixel = (PIXEL *) malloc(sizeof(PIXEL));
     for (int x = 0; x < info->biWidth; x++) {
         for (int y = 0; y < info->biHeight; y++) {
-            fread(&r,1,1,f);
-            fread(&g,1,1,f);
-            fread(&b,1,1,f);
-            printf("(%d,%d): r%.2x g%.2x b%.2x\n", x, y, r, g, b);
+            fread(&pixel->R,1,1,f);
+            fread(&pixel->G,1,1,f);
+            fread(&pixel->B,1,1,f);
+            printf("(%d,%d): r%.2x g%.2x b%.2x\n", x, y, pixel->R, pixel->G, pixel->B);
         }
     }
     free(bmp);
