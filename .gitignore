@@ -53,3 +53,7 @@ dkms.conf
 
 # IDE Settings
 /.vscode
+
+# Output Files
+out.*
+output.*

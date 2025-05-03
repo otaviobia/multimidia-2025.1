@@ -1,83 +1,125 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "bitmap.h"
 
-typedef struct /**** BMP file header structure ****/
-{
-    unsigned short bfType; /* Magic number for file = "MB" */
-    unsigned int bfSize; /* Size of file */
-    unsigned short bfReserved1; /* Reserved */
-    unsigned short bfReserved2; /* ... */
-    unsigned int bfOffBits; /* Offset to bitmap data */
-} BMPFILEHEADER;
+void loadBMPHeaders (FILE *fp, BITMAPFILEHEADER *FileHeader, BITMAPINFOHEADER *InfoHeader) {
+    /*
+     * Lê os cabeçalhos do arquivo BMP, armazena as informações nas estruturas
+     * FileHeader e InfoHeader, e imprime os campos dessas estruturas.
+     */
+    readHeader(fp, FileHeader);
+    readInfoHeader(fp, InfoHeader);
 
-typedef struct /**** BMP file info structure ****/
-{
-    unsigned int biSize; /* Size of info header */
-    int biWidth; /* Width of image */
-    int biHeight; /* Height of image */
-    unsigned short biPlanes; /* Number of color planes */
-    unsigned short biBitCount; /* Number of bits per pixel */
-    unsigned int biCompression; /* Type of compression to use */
-    unsigned int biSizeImage; /* Size of image data */
-    int biXPelsPerMeter; /* X pixels per meter */
-    int biYPelsPerMeter; /* Y pixels per meter */
-    unsigned int biClrUsed; /* Number of colors used */
-    unsigned int biClrImportant; /* Number of important colors */
-} BMPINFOHEADER;
-
-typedef struct /**** Pixel info structure ****/
-{
-    unsigned int R; /* Red value of pixel (0-255)*/
-    unsigned int G; /* Green value of pixel (0-255)*/
-    unsigned int B; /* Blue value of pixel (0-255)*/
-} PIXEL;
-
-void leituraHeader(FILE *F, BMPFILEHEADER *H) {
-    /*F é o arquivo Bitmap que deve ter sido “lido” do disco*/
-    fread(&H->bfType,sizeof (unsigned short int),1,F);
-    fread(&H->bfSize,sizeof (unsigned int),1,F);
-    fread(&H->bfReserved1,sizeof (unsigned short int),1,F);
-    fread(&H->bfReserved2,sizeof (unsigned short int),1,F);
-    fread(&H->bfOffBits,sizeof (unsigned int),1,F);
-}
-
-void leituraInfo(FILE *F, BMPINFOHEADER *H) {
-    /*F é o arquivo Bitmap que deve ter sido “lido” do disco*/
-    fread(&H->biSize,sizeof (unsigned int),1,F);
-    fread(&H->biWidth,sizeof (int),1,F);
-    fread(&H->biHeight,sizeof (int),1,F);
-    fread(&H->biPlanes,sizeof (unsigned short int),1,F);
-    fread(&H->biBitCount,sizeof (unsigned short int),1,F);
-    fread(&H->biCompression,sizeof (unsigned int),1,F);
-    fread(&H->biSizeImage,sizeof (unsigned int),1,F);
-    fread(&H->biXPelsPerMeter,sizeof (int),1,F);
-    fread(&H->biYPelsPerMeter,sizeof (int),1,F);
-    fread(&H->biClrUsed,sizeof (unsigned int),1,F);
-    fread(&H->biClrImportant,sizeof (unsigned int),1,F);
-}
-
-int main(void) {
-    FILE *f = fopen("mybmp.bmp", "r");
-    BMPFILEHEADER *bmp = (BMPFILEHEADER*) malloc(sizeof(BMPFILEHEADER));
-    BMPINFOHEADER *info = (BMPINFOHEADER*) malloc(sizeof(BMPINFOHEADER));
-    leituraHeader(f, bmp);
-    leituraInfo(f, info);
-    printf("Magic Number: %x\nSize:%hu\nReserved 1: %hu\nReserved 2: %hu\nOffset to data: %hu\n", bmp->bfType, bmp->bfSize, bmp->bfReserved1, bmp->bfReserved2, bmp->bfOffBits);
-    printf("%hu %hu %hu %hu %hu %hu %hu %hu %hu %hu %hu\n",
-    info->biSize, info->biWidth, info->biHeight, info->biPlanes, info->biBitCount,
-    info->biCompression, info->biSizeImage, info->biXPelsPerMeter, info->biYPelsPerMeter,
-    info->biClrUsed, info->biClrImportant);
-    PIXEL *pixel = (PIXEL *) malloc(sizeof(PIXEL));
-    for (int x = 0; x < info->biWidth; x++) {
-        for (int y = 0; y < info->biHeight; y++) {
-            fread(&pixel->R,1,1,f);
-            fread(&pixel->G,1,1,f);
-            fread(&pixel->B,1,1,f);
-            printf("(%d,%d): r%.2x g%.2x b%.2x\n", x, y, pixel->R, pixel->G, pixel->B);
-        }
+    // Para a execução se o arquivo BMP já estiver comprimido
+    if (InfoHeader->Compression != 0) {
+        printf("This is a compressed BMP!!!");
+        fclose(fp);
+        return;
     }
-    free(bmp);
-    free(info);
-    fclose(f);
-    return(0);
+    
+    printHeaders(FileHeader, InfoHeader);
+}
+
+void readHeader(FILE *F, BITMAPFILEHEADER *H) {
+    /*
+     * Usa a função fread para ler o cabeçalho do arquivo BMP e armazena os campos
+     * na estrutura H.
+     */
+    fread(&H->Type,sizeof (unsigned short int),1,F);
+    fread(&H->Size,sizeof (unsigned int),1,F);
+    fread(&H->Reserved1,sizeof (unsigned short int),1,F);
+    fread(&H->Reserved2,sizeof (unsigned short int),1,F);
+    fread(&H->OffBits,sizeof (unsigned int),1,F);
+}
+
+void readInfoHeader(FILE *F, BITMAPINFOHEADER *INFO_H) {
+    /*
+     * Usa a função fread para ler o cabeçalho de informações do arquivo BMP e armazena
+     * os campos na estrutura INFO_H.
+     */
+    fread(&INFO_H->Size,sizeof (unsigned int),1,F);
+    fread(&INFO_H->Width,sizeof (int),1,F);
+    fread(&INFO_H->Height,sizeof (int),1,F);
+    fread(&INFO_H->Planes,sizeof (unsigned short int),1,F);
+    fread(&INFO_H->BitCount,sizeof (unsigned short int),1,F);
+    fread(&INFO_H->Compression,sizeof (unsigned int),1,F);
+    fread(&INFO_H->SizeImage,sizeof (unsigned int),1,F);
+    fread(&INFO_H->XResolution,sizeof (int),1,F);
+    fread(&INFO_H->YResolution,sizeof (int),1,F);
+    fread(&INFO_H->NColours,sizeof (unsigned int),1,F);
+    fread(&INFO_H->ImportantColours,sizeof (unsigned int),1,F);        
+}
+
+void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader) {
+    /*
+     * Imprime os campos das estruturas FileHeader e InfoHeader.
+     */
+    printf("*************** File Header ***************\n\n");
+    
+    printf("Magic number for file: %x\n", FileHeader->Type);   
+    printf("File's size: %d\n",FileHeader->Size);           
+    printf("Offset to bitmap data: %d\n", FileHeader->OffBits);
+    
+    printf("\n\n");
+    printf("*************** Info Header ***************\n\n");
+    printf("Info header's size: %d\n", InfoHeader->Size);
+    printf("Width: %d\n", InfoHeader->Width);          
+    printf("Height: %d\n",InfoHeader->Height);
+    printf("Color planes: %d\n", InfoHeader->Planes);
+    printf("Bits per pixel: %d\n", InfoHeader->BitCount);
+    printf("Compression type (0 = no compression): %d\n", InfoHeader->Compression);
+    printf("Image's data size: %d\n", InfoHeader->SizeImage);
+    printf("X Pixels per meter: %d\n", InfoHeader->XResolution);
+    printf("Y Pixels per meter: %d\n", InfoHeader->YResolution);
+    printf("Number of colors: %d\n", InfoHeader->NColours);
+    printf("Number of important colors: %d\n", InfoHeader->ImportantColours); 
+}
+
+void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXEL *Image) {
+    /* 
+     * Lê os pixels do arquivo BMP e armazena no vetor de pixels Image.
+     * A imagem é lida em ordem BGR (azul, verde, vermelho).
+     */    
+    fseek(input, 54, SEEK_SET); // pular o header (54 bytes)
+
+    int tam = InfoHeader.Height * InfoHeader.Width;
+    for (int i = 0; i < tam; i++) {
+        Image[i].B = fgetc(input);
+        Image[i].G = fgetc(input);
+        Image[i].R = fgetc(input);
+    }
+}
+
+void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXEL *Image) {
+    /*
+     * Escreve os cabeçalhos e os pixels no arquivo de saída.
+     */
+    fseek(output, 0, SEEK_SET);
+    
+    // Escreve FileHeader
+    fwrite(&FileHeader.Type, sizeof (unsigned short int), 1, output);
+    fwrite(&FileHeader.Size, sizeof (unsigned int), 1, output);
+    fwrite(&FileHeader.Reserved1, sizeof (unsigned short int), 1, output);
+    fwrite(&FileHeader.Reserved2, sizeof (unsigned short int), 1, output);
+    fwrite(&FileHeader.OffBits, sizeof (unsigned int), 1, output);
+    
+    // Escreve InfoHeader
+    fwrite(&InfoHeader.Size, sizeof (unsigned int), 1, output);
+    fwrite(&InfoHeader.Width, sizeof (int), 1, output);
+    fwrite(&InfoHeader.Height, sizeof (int), 1, output);
+    fwrite(&InfoHeader.Planes, sizeof (unsigned short int), 1, output);
+    fwrite(&InfoHeader.BitCount, sizeof (unsigned short int), 1, output);
+    fwrite(&InfoHeader.Compression, sizeof (unsigned int), 1, output);
+    fwrite(&InfoHeader.SizeImage, sizeof (unsigned int), 1, output);
+    fwrite(&InfoHeader.XResolution, sizeof (int), 1, output);
+    fwrite(&InfoHeader.YResolution, sizeof (int), 1, output);
+    fwrite(&InfoHeader.NColours, sizeof (unsigned int), 1, output);
+    fwrite(&InfoHeader.ImportantColours, sizeof (unsigned int), 1, output);
+
+    // Escreve os pixels
+    for (int i = 0; i < (InfoHeader.Height * InfoHeader.Width); i++) {
+        fputc(Image[i].B, output);
+        fputc(Image[i].G, output);
+        fputc(Image[i].R, output);
+    }
 }
