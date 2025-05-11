@@ -1,6 +1,6 @@
 #ifndef _BITMAP_H_
     #define _BITMAP_H_
-
+    #include <stdio.h>
     typedef struct {                     /**** BMP file header structure ****/ 
         unsigned short Type;             /* Magic number for file */
         unsigned int   Size;             /* Size of file */
