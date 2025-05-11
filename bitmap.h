@@ -25,16 +25,24 @@
         unsigned int   ImportantColours; /* Number of important colors */
     } BITMAPINFOHEADER;
 
-    typedef struct {                     /**** Pixel structure ****/
+    typedef struct {                     /**** Pixel structure in RGB ****/
         unsigned char R;                 /* Red */
         unsigned char G;                 /* Green */
         unsigned char B;                 /* Blue */
-    } PIXEL;    
+    } PIXELRGB;
+
+    typedef struct {                     /**** Pixel structure in YCbCr ****/
+        unsigned char Y;                 /* Luma */
+        unsigned char Cb;                /* Chroma Blue */
+        unsigned char Cr;                /* Chroma Red */
+    } PIXELYCBCR;
             
     void loadBMPHeaders (FILE *fp, BITMAPFILEHEADER *FileHeader, BITMAPINFOHEADER *InfoHeader);
     void readInfoHeader(FILE *F, BITMAPINFOHEADER *INFO_H);
     void readHeader(FILE *F, BITMAPFILEHEADER *H);
-    void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXEL *Image);
+    void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image);
     void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader);
-    void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXEL *Image);
+    void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image);
+    void convertToYCBCR(PIXELRGB *Image, PIXELYCBCR *ImageYCbCr, int tam);
+    void convertToRGB(PIXELYCBCR *ImageYCbCr, PIXELRGB *Image, int tam);
 #endif

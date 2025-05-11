@@ -11,7 +11,7 @@ int main(void)
      * em um novo arquivo BMP.
      */
     FILE *input;
-    if (!(input = fopen("colors.bmp", "rb"))) {
+    if (!(input = fopen("images/blackbuck.bmp", "rb"))) {
         printf("Error: could not open input file." );
         exit(1);
     }
@@ -22,33 +22,41 @@ int main(void)
     loadBMPHeaders(input, &FileHeader, &InfoHeader);
 
     // Aloca memória para o vetor de pixels (tam = largura * altura)
-    PIXEL *Pixels;
+    PIXELRGB *Pixels;
     int tam = InfoHeader.Width * InfoHeader.Height;
-    Pixels = (PIXEL *) malloc(tam * sizeof(PIXEL));
+    Pixels = (PIXELRGB *) malloc(tam * sizeof(PIXELRGB));
 
     // Lê os pixels do arquivo BMP e armazena no vetor de pixels
     readPixels(input, InfoHeader, Pixels);
         
-    /* Brincadeira com RGB: Troca os canais R e B */
     FILE *output;
     if (!(output = fopen("out.bmp", "wb"))) {
         printf("Error: could not open output file." );
         exit(1);
     }
 
-    // Troca os canais R e B dos pixels
+    /* Troca os canais R e B dos pixels
     unsigned char aux_;
     for (int i = 0; i < tam; i++) {
         aux_ = Pixels[i].R;
         Pixels[i].R = Pixels[i].B;
         Pixels[i].B = aux_;
-    }
+    }*/
+
+    // Converte os pixels de RGB para YCbCr
+    PIXELYCBCR *PixelsYCbCr;
+    PixelsYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
+    convertToYCBCR(Pixels, PixelsYCbCr, tam);
+
+    // Volta os pixels de YCbCr para RGB
+    convertToRGB(PixelsYCbCr, Pixels, tam);
 
     // Escreve os cabeçalhos e os pixels no arquivo de saída
     writeBMP(output, FileHeader, InfoHeader, Pixels);
 
     // Libera a memória alocada e fecha os arquivos
     free(Pixels);
+    free(PixelsYCbCr);
     fclose(input);
     fclose(output);
     exit(0);

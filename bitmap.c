@@ -75,7 +75,7 @@ void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader) 
     printf("Number of important colors: %d\n", InfoHeader->ImportantColours); 
 }
 
-void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXEL *Image) {
+void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image) {
     /* 
      * Lê os pixels do arquivo BMP e armazena no vetor de pixels Image.
      * A imagem é lida em ordem BGR (azul, verde, vermelho).
@@ -90,7 +90,7 @@ void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXEL *Image) {
     }
 }
 
-void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXEL *Image) {
+void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image) {
     /*
      * Escreve os cabeçalhos e os pixels no arquivo de saída.
      */
@@ -121,5 +121,43 @@ void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHe
         fputc(Image[i].B, output);
         fputc(Image[i].G, output);
         fputc(Image[i].R, output);
+    }
+}
+
+unsigned char clampFloatToByte(float value) {
+    if (value < 0.0f) return 0;
+    if (value > 255.0f) return 255;
+    return (unsigned char)(value + 0.5f); // arredonda
+}
+
+void convertToYCBCR(PIXELRGB *Image, PIXELYCBCR *ImageYCbCr, int tam) {
+    for (int i = 0; i < tam; i++) {
+        float R = Image[i].R;
+        float G = Image[i].G;
+        float B = Image[i].B;
+
+        float Y  =  0.299f * R + 0.587f * G + 0.114f * B;
+        float Cb = -0.1687f * R - 0.3313f * G + 0.5f * B + 128.0f;
+        float Cr =  0.5f * R - 0.4187f * G - 0.0813f * B + 128.0f;
+
+        ImageYCbCr[i].Y  = clampFloatToByte(Y);
+        ImageYCbCr[i].Cb = clampFloatToByte(Cb);
+        ImageYCbCr[i].Cr = clampFloatToByte(Cr);
+    }
+}
+
+void convertToRGB(PIXELYCBCR *ImageYCbCr, PIXELRGB *Image, int tam) {
+    for (int i = 0; i < tam; i++) {
+        float Y  = ImageYCbCr[i].Y;
+        float Cb = ImageYCbCr[i].Cb - 128.0f;
+        float Cr = ImageYCbCr[i].Cr - 128.0f;
+
+        float R = Y + 1.402f * Cr;
+        float G = Y - 0.344136f * Cb - 0.714136f * Cr;
+        float B = Y + 1.772f * Cb;
+
+        Image[i].R = clampFloatToByte(R);
+        Image[i].G = clampFloatToByte(G);
+        Image[i].B = clampFloatToByte(B);
     }
 }
