@@ -1,11 +1,11 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 
 #include "bitmap.h"
 #include "dct.h"
-       
+#include "test.h"
+
 int main(void)
 {
     /*
@@ -14,7 +14,7 @@ int main(void)
      * em um novo arquivo BMP.
      */
     FILE *input;
-    if (!(input = fopen("images/blackbuck.bmp", "rb"))) {
+    if (!(input = fopen("images/colors.bmp", "rb"))) {
         printf("Error: could not open input file." );
         exit(1);
     }
@@ -26,8 +26,10 @@ int main(void)
 
     // Aloca memória para o vetor de pixels (tam = largura * altura)
     PIXELRGB *Pixels;
+    PIXELRGB *Pixelsrec;
     int tam = InfoHeader.Width * InfoHeader.Height;
     Pixels = (PIXELRGB *) malloc(tam * sizeof(PIXELRGB));
+    Pixelsrec = (PIXELRGB *) malloc(tam * sizeof(PIXELRGB));
 
     // Lê os pixels do arquivo BMP e armazena no vetor de pixels
     readPixels(input, InfoHeader, Pixels);
@@ -49,10 +51,12 @@ int main(void)
     // Converte os pixels de RGB para YCbCr
     PIXELYCBCR *PixelsYCbCr;
     PixelsYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
+    
     convertToYCBCR(Pixels, PixelsYCbCr, tam);
 
     // Volta os pixels de YCbCr para RGB
-    convertToRGB(PixelsYCbCr, Pixels, tam);
+    convertToRGB(PixelsYCbCr, Pixelsrec, tam);
+    compareRGB(Pixels, Pixelsrec, tam);
 
     // Escreve os cabeçalhos e os pixels no arquivo de saída
     writeBMP(output, FileHeader, InfoHeader, Pixels);
@@ -89,6 +93,7 @@ int main(void)
     // Libera a memória alocada e fecha os arquivos
     free(Pixels);
     free(PixelsYCbCr);
+    free(Pixelsrec);
     fclose(input);
     fclose(output);
     exit(0);
