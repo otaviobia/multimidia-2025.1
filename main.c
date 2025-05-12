@@ -86,14 +86,9 @@ int main(void)
     inverseDCTMatrix(DctfrequenciesMatrix, reconstructedBlockMatrix);
 
     // Comparação entre DCT e DCTMatrix, Reconstructed e ReconstructedMatrix
-    printf("DCT vs DCTMatrix and Reconstructed vs ReconstructedMatrix:\n");
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            printf("DCT: %6.2f, DCTMatrix: %6.2f, Diff: %6.2f | Reconstructed: %6.2f, ReconstructedMatrix: %6.2f, Diff: %6.2f\n",
-                Dctfrequencies[i][j], DctfrequenciesMatrix[i][j], fabs(Dctfrequencies[i][j] - DctfrequenciesMatrix[i][j]),
-                reconstructedBlock[i][j], reconstructedBlockMatrix[i][j], fabs(reconstructedBlock[i][j] - reconstructedBlockMatrix[i][j]));
-        }
-    }
+    DCTBenchComparison(Dctfrequencies,DctfrequenciesMatrix, reconstructedBlock,reconstructedBlockMatrix);
+    compareBlock(block,reconstructedBlock);
+    compareBlock(block,reconstructedBlockMatrix);
 
     // Libera a memória alocada e fecha os arquivos
     free(Pixels);
