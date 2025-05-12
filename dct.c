@@ -12,6 +12,21 @@ void precomputeCosines(float cosTable[8][8]) {
     }
 }
 
+void precomputeTransformation(float C[8][8]) {
+    float cosTable[8][8];
+    precomputeCosines(cosTable);
+
+    const float sqrt1 = 1.0f / sqrt(8);
+    static const float sqrt2 = 1.0f / 2.0f;
+
+    for (int i = 0; i < 8; i++) {
+        float alpha = (i == 0) ? sqrt1 : sqrt2;
+        for (int j = 0; j < 8; j++) {
+            C[i][j] = alpha * cosTable[i][j];
+        }
+    }
+}
+
 void forwardDCT(float block[8][8], float Dctfrequencies[8][8]) {
     float C[8] = {1.0/sqrt(2),1.0,1.0,1.0,1.0,1.0,1.0,1.0};
 
@@ -50,4 +65,58 @@ void inverseDCT(float Dctfrequencies[8][8], float block[8][8]) {
             block[x][y] = sum/4.0;
         }
     }
+}
+void MatrixMul(float A[8][8], float B[8][8], float Dest[8][8]) {
+    for (int i = 0; i < 8; i++) { // loop over rows of A
+        for (int j = 0; j < 8; j++) { // loop over columns of B
+            for(int k = 0; k < 8; k++) { // Loop over columns of A and rows of B
+                Dest[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+}
+
+void MatrixMulSecTransp(float A[8][8], float B[8][8], float Dest[8][8]) {
+    for (int i = 0; i < 8; i++) { // loop over rows of A	
+        for (int j = 0; j < 8; j++) { // loop over rows of B
+            for(int k = 0; k < 8; k++) { // Loop over columns of A and B^T
+                Dest[i][j] += A[i][k] * B[j][k]; // Inverted B to simulate transpose
+            }
+        }
+    }
+}
+
+void MatrixMulFirstTransp(float A[8][8], float B[8][8], float Dest[8][8]) {
+    for (int i = 0; i < 8; i++) { // loop over rows of A	
+        for (int j = 0; j < 8; j++) { // loop over rows of B
+            for(int k = 0; k < 8; k++) { // Loop over columns of A^t and B
+                Dest[i][j] += A[k][i] * B[k][j]; // Inverted A to simulate transpose
+            }
+        }
+    }
+}
+
+void forwardDCTMatrix(float block[8][8], float Dctfrequencies[8][8]) {
+    float C[8][8];
+    precomputeTransformation(C);
+    float temp[8][8] = {0};
+    MatrixMul(C, block, temp);
+    MatrixMulSecTransp(temp, C, Dctfrequencies);
+    // Dct = C * block * C^T 
+    // temp = C * B => Dct = temp * C^T 
+
+
+}
+
+void inverseDCTMatrix(float Dctfrequencies[8][8], float block[8][8]) {
+    float C[8][8];
+    precomputeTransformation(C);
+    float temp[8][8] = {0};
+
+    MatrixMulFirstTransp(C, Dctfrequencies, temp);
+    MatrixMul(temp, C, block);
+
+    // IDct = C^T * Dctf * C 
+    // temp = C^T * Dctf => IDct = temp * C 
+
 }
