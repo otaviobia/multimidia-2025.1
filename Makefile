@@ -1,5 +1,8 @@
-all: main.o bitmap.o test.o
-	gcc -Wall -std=c99 -o main main.o bitmap.o test.o
+all: main.o bitmap.o dct.o test.o
+	gcc -Wall -std=c99 -o main main.o bitmap.o test.o dct.o
+
+dct.o: dct.c dct.h
+	gcc -Wall -std=c99 -c dct.c
 
 main.o: main.c bitmap.h
 	gcc -Wall -std=c99 -c main.c
