@@ -75,20 +75,20 @@ int main(void)
         {87, 79, 69, 68, 65, 76, 78, 94}
     };
 
-    float Dctfrequencies[8][8];
-    float reconstructedBlock[8][8];
+    float Dctfrequencies[8][8] = {0};
+    float reconstructedBlock[8][8] = {0};
+    float DctfrequenciesMatrix[8][8] = {0};
+    float reconstructedBlockMatrix[8][8] = {0};
 
     forwardDCT(block, Dctfrequencies);
     inverseDCT(Dctfrequencies, reconstructedBlock);
+    forwardDCTMatrix(block, DctfrequenciesMatrix);
+    inverseDCTMatrix(DctfrequenciesMatrix, reconstructedBlockMatrix);
 
-    // Funcao Teste , talvez dps colocar no .test (sumarizado)
-    printf("Original Block vs Reconstructed Block:\n");
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            printf("Original: %6.2f, DCT: %6.2f, Reconstructed: %6.2f, Diff: %6.2f\n",
-                block[i][j], Dctfrequencies[i][j], reconstructedBlock[i][j], fabs(block[i][j] - reconstructedBlock[i][j]));
-        }
-    }
+    // Comparação entre DCT e DCTMatrix, Reconstructed e ReconstructedMatrix
+    DCTBenchComparison(Dctfrequencies,DctfrequenciesMatrix, reconstructedBlock,reconstructedBlockMatrix);
+    compareBlock(block,reconstructedBlock);
+    compareBlock(block,reconstructedBlockMatrix);
 
     // Libera a memória alocada e fecha os arquivos
     free(Pixels);
