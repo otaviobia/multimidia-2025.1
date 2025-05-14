@@ -11,8 +11,4 @@
     void MatrixMulFirstTransp(float A[8][8], float B[8][8], float Dest[8][8]);
     void MatrixMulSecTransp(float A[8][8], float B[8][8], float Dest[8][8]);
 
-
-
-
-
 #endif
