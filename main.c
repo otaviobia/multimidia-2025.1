@@ -9,7 +9,7 @@
 int main(void) {
     /* COMPRESSÃO */
     // 1. Abre o arquivo BMP de entrada
-    FILE *input = fopen("images/lenna.bmp", "rb");
+    FILE *input = fopen("images/colors.bmp", "rb");
     if (!input) {
         printf("Error: could not open input file.\n");
         return 1;
@@ -34,6 +34,9 @@ int main(void) {
     // 5. Converte os pixels de RGB para YCbCr
     PIXELYCBCR *PixelsYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
     convertToYCBCR(Pixels, PixelsYCbCr, tam);
+
+
+    testImageSubsampling(PixelsYCbCr, width, height);
 
     // 6. Aplica a DCT e retorna os macroblocos de 16x16
     // Essa função também faz a subamostragem 4:2:0
