@@ -66,8 +66,10 @@ void inverseDCT(float Dctfrequencies[8][8], float block[8][8]) {
     }
 }
 void MatrixMul(float A[8][8], float B[8][8], float Dest[8][8]) {
+    memset(Dest, 0, sizeof(float) * 64);
     for (int i = 0; i < 8; i++) { // loop over rows of A
         for (int j = 0; j < 8; j++) { // loop over columns of B
+            Dest[i][j] = 0;
             for(int k = 0; k < 8; k++) { // Loop over columns of A and rows of B
                 Dest[i][j] += A[i][k] * B[k][j];
             }
@@ -96,6 +98,7 @@ void MatrixMulFirstTransp(float A[8][8], float B[8][8], float Dest[8][8]) {
 }
 
 void forwardDCTMatrix(float block[8][8], float Dctfrequencies[8][8]) {
+    memset(Dctfrequencies, 0, sizeof(float) * 64);
     float C[8][8];
     precomputeTransformation(C);
     float temp[8][8] = {0};
@@ -108,6 +111,7 @@ void forwardDCTMatrix(float block[8][8], float Dctfrequencies[8][8]) {
 }
 
 void inverseDCTMatrix(float Dctfrequencies[8][8], float block[8][8]) {
+    memset(block, 0, sizeof(float) * 64);	
     float C[8][8];
     precomputeTransformation(C);
     float temp[8][8] = {0};
