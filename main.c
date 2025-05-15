@@ -9,7 +9,7 @@
 int main(void) {
     /* COMPRESSÃO */
     // 1. Abre o arquivo BMP de entrada
-    FILE *input = fopen("images/colors.bmp", "rb");
+    FILE *input = fopen("images/cameraman.bmp", "rb");
     if (!input) {
         printf("Error: could not open input file.\n");
         return 1;
@@ -35,6 +35,7 @@ int main(void) {
     PIXELYCBCR *PixelsYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
     convertToYCBCR(Pixels, PixelsYCbCr, tam);
 
+    testImageWithoutDCT(PixelsYCbCr, width, height, FileHeader, InfoHeader);
 
     testImageSubsampling(PixelsYCbCr, width, height);
 
@@ -59,6 +60,7 @@ int main(void) {
         return 1;
     }
     writeBMP(output, FileHeader, InfoHeader, PixelsOut);
+    saveChannelImages(DecodedYCbCr, width, height, FileHeader, InfoHeader);
     fclose(output);
 
     // Libera a memória alocada

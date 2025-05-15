@@ -57,3 +57,4 @@ dkms.conf
 # Output Files
 out.*
 output.*
+*.bmp

@@ -97,12 +97,12 @@ void DCTBenchComparison(const float Dctfrequencies0[8][8], const float Dctfreque
     }
 }
 
-void compareYBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x, int start_y, int width, int height) {
+int compareYBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x, int start_y, int width, int height) {
     int cont = 0;
     int diff = 2;
     int biggestDiff = 0;
     
-    printf("*************** Y Block Comparison Info ***************\n");
+    //printf("*************** Y Block Comparison Info ***************\n");
 
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
@@ -121,19 +121,18 @@ void compareYBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x,
     }
 
     if (cont == 0) {
-        printf("No differences found.\n");
+        return 0;
     } else {
-        printf("Differences found: %d\n", cont);
-        printf("Biggest Y difference: %d\n", biggestDiff);
+        return 1;
     }
 }
 
-void compareCbCrBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x, int start_y, int width, int height) {
+int compareCbCrBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x, int start_y, int width, int height) {
     int contCb = 0, contCr = 0;
     int diff = 2;
     int biggestCb = 0, biggestCr = 0;
     
-    printf("*************** CbCr Block Comparison Info ***************\n");
+    //printf("*************** CbCr Block Comparison Info ***************\n");
 
     for (int y = 0; y < 16; y++) {
         for (int x = 0; x < 16; x++) {
@@ -157,16 +156,9 @@ void compareCbCrBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start
     }
 
     if (contCb == 0 && contCr == 0) {
-        //printf("No differences found in CbCr block.\n");
+        return 0;
     } else {
-        if (contCb > 0) {
-            printf("Differences found in Cb: %d at startx %d & starty %d\n", contCb,start_x,start_y);
-            //printf("Biggest Cb difference: %d\n", biggestCb);
-        }
-        if (contCr > 0) {
-            printf("Differences found in Cr: %d at startx %d & starty %d\n", contCr,start_x,start_y);
-            //printf("Biggest Cr difference: %d\n", biggestCr);
-        }
+        return 1;
     }
 }
 
@@ -190,22 +182,27 @@ void testImageSubsampling(PIXELYCBCR *image, int width, int height) {
                 reconstructBlock8x8_Y(recon, y_temp, ox, oy, width, height);
                 
                 // Compare the block
-                //compareYBlock(image, recon, ox, oy, width, height);
+                int cont = compareYBlock(image, recon, ox, oy, width, height);
+                printf("%d ",cont);
+
             }
 
             // Test CbCr (16x16 block)
-            float cb_temp[8][8], cr_temp[8][8];
+            //float cb_temp[8][8], cr_temp[8][8];
             
             // Extract and immediately reconstruct Cb and Cr
-            extract_block_chroma420(image, cb_temp, bx, by, width, height, 'B');
-            extract_block_chroma420(image, cr_temp, bx, by, width, height, 'R');
+            //extract_block_chroma420(image, cb_temp, bx, by, width, height, 'B');
+            //extract_block_chroma420(image, cr_temp, bx, by, width, height, 'R');
             
-            reconstructBlock8x8_CbCr420(recon, cb_temp, bx, by, width, height, 'B');
-            reconstructBlock8x8_CbCr420(recon, cr_temp, bx, by, width, height, 'R');
+            //reconstructBlock8x8_CbCr420(recon, cb_temp, bx, by, width, height, 'B');
+            //reconstructBlock8x8_CbCr420(recon, cr_temp, bx, by, width, height, 'R');
             
             // Compare the block
-            compareCbCrBlock(image, recon, bx, by, width, height);
+           // int cont = compareCbCrBlock(image, recon, bx, by, width, height);
+            //printf("%d ",cont);
         }
+        printf("\n");
+
     }
 
     printf("\nFull Image Statistics:\n");
@@ -214,4 +211,115 @@ void testImageSubsampling(PIXELYCBCR *image, int width, int height) {
            (width + 15) / 16, (height + 15) / 16);
 
     free(recon);
+}
+
+void saveChannelImages(PIXELYCBCR *pixels, int width, int height, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader) {
+    int size = width * height;
+    PIXELRGB *tempPixels = (PIXELRGB*)malloc(size * sizeof(PIXELRGB));
+    
+    // Create Y channel image (grayscale)
+    for (int i = 0; i < size; i++) {
+        tempPixels[i].R = pixels[i].Y;
+        tempPixels[i].G = pixels[i].Y;
+        tempPixels[i].B = pixels[i].Y;
+    }
+    
+    FILE *outputY = fopen("channel_Y.bmp", "wb");
+    if (outputY) {
+        writeBMP(outputY, FileHeader, InfoHeader, tempPixels);
+        fclose(outputY);
+        printf("Y channel saved to channel_Y.bmp\n");
+    }
+    
+    // Create Cb channel image (grayscale)
+    for (int i = 0; i < size; i++) {
+        // Shift to make visible (Cb is centered at 128)
+        unsigned char value = pixels[i].Cb;
+        tempPixels[i].R = value;
+        tempPixels[i].G = value;
+        tempPixels[i].B = value;
+    }
+    
+    FILE *outputCb = fopen("channel_Cb.bmp", "wb");
+    if (outputCb) {
+        writeBMP(outputCb, FileHeader, InfoHeader, tempPixels);
+        fclose(outputCb);
+        printf("Cb channel saved to channel_Cb.bmp\n");
+    }
+    
+    // Create Cr channel image (grayscale)
+    for (int i = 0; i < size; i++) {
+        // Shift to make visible (Cr is centered at 128)
+        unsigned char value = pixels[i].Cr;
+        tempPixels[i].R = value;
+        tempPixels[i].G = value;
+        tempPixels[i].B = value;
+    }
+    
+    FILE *outputCr = fopen("channel_Cr.bmp", "wb");
+    if (outputCr) {
+        writeBMP(outputCr, FileHeader, InfoHeader, tempPixels);
+        fclose(outputCr);
+        printf("Cr channel saved to channel_Cr.bmp\n");
+    }
+    
+    free(tempPixels);
+}
+
+void testImageWithoutDCT(PIXELYCBCR *image, int width, int height, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader) {
+    printf("*************** Teste Sem DCT ***************\n");
+    
+    // Cria imagem temporária para a reconstrução
+    PIXELYCBCR *recon = (PIXELYCBCR *)malloc(width * height * sizeof(PIXELYCBCR));
+    
+    // É importante inicializar com zeros
+    memset(recon, 0, width * height * sizeof(PIXELYCBCR));
+    
+    int mb_width = (width + 15) / 16;
+    int mb_height = (height + 15) / 16;
+    
+    // Para cada macrobloco
+    for (int by = 0; by < mb_height * 16; by += 16) {
+        for (int bx = 0; bx < width; bx += 16) {
+            // Processa os 4 blocos Y
+            for (int i = 0; i < 4; i++) {
+                int ox = bx + (i % 2) * 8;
+                int oy = by + (i / 2) * 8;
+                
+                // Extrai bloco Y
+                float y_temp[8][8];
+                extract_block_y(image, y_temp, ox, oy, width, height);
+                
+                // Reconstrui bloco Y diretamente
+                reconstructBlock8x8_Y(recon, y_temp, ox, oy, width, height);
+            }
+            
+            // Extrai blocos Cb e Cr
+            float cb_temp[8][8], cr_temp[8][8];
+            extract_block_chroma420(image, cb_temp, bx, by, width, height, 'B');
+            extract_block_chroma420(image, cr_temp, bx, by, width, height, 'R');
+            
+            // Reconstrói diretamente sem DCT
+            reconstructBlock8x8_CbCr420(recon, cb_temp, bx, by, width, height, 'B');
+            reconstructBlock8x8_CbCr420(recon, cr_temp, bx, by, width, height, 'R');
+        }
+    }
+    
+    // Compara as duas imagens
+    //compareReconstructions(image, recon, width, height);
+    
+    // Para debug visual, salve a imagem reconstruída
+    PIXELRGB *reconRGB = (PIXELRGB *)malloc(width * height * sizeof(PIXELRGB));
+    convertToRGB(recon, reconRGB, width * height);
+    
+    FILE *output = fopen("recon_without_dct.bmp", "wb");
+    if (output) {
+
+        
+        writeBMP(output, FileHeader, InfoHeader, reconRGB);
+        fclose(output);
+    }
+    
+    free(recon);
+    free(reconRGB);
 }
