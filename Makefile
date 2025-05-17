@@ -20,4 +20,4 @@ run:
 	./main
 
 clean:
-	rm -f *.o main *.exe out.bmp
+	rm -f *.o main *.exe *.bmp

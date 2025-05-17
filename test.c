@@ -280,7 +280,7 @@ void testImageWithoutDCT(PIXELYCBCR *image, int width, int height, BITMAPFILEHEA
     
     // Para cada macrobloco
     for (int by = 0; by < mb_height * 16; by += 16) {
-        for (int bx = 0; bx < width; bx += 16) {
+        for (int bx = 0; bx < mb_width * 16; bx += 16) {
             // Processa os 4 blocos Y
             for (int i = 0; i < 4; i++) {
                 int ox = bx + (i % 2) * 8;
