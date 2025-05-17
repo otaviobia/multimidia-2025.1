@@ -8,6 +8,8 @@
 
 int main(void) {
     /* COMPRESSÃO */
+    float factor = 1.0f; // Fator de compressão
+
     // 1. Abre o arquivo BMP de entrada
     FILE *input = fopen("images/cameraman.bmp", "rb");
     if (!input) {
@@ -45,15 +47,21 @@ int main(void) {
     MACROBLOCO *blocks = encodeImageYCbCr(PixelsYCbCr, width, height, &macroblock_count);
     printf("Number of macroblocks: %d\n", macroblock_count);
 
+    // 7. Aplica a quantização nos macroblocos
+    quantizeMacroblocks(blocks, macroblock_count, factor);
+
     /* DESCOMPRESSÃO */
-    // 1. Gera a imagem YCbCr a partir dos macroblocos
+    // 1. Aplica a dequantização nos macroblocos
+    dequantizeMacroblocks(blocks, macroblock_count, factor);
+
+    // 2. Gera a imagem YCbCr a partir dos macroblocos
     PIXELYCBCR *DecodedYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
     decodeImageYCbCr(blocks, DecodedYCbCr, width, height);
 
-    // 2. Converte os pixels de YCbCr para RGB
+    // 3. Converte os pixels de YCbCr para RGB
     convertToRGB(DecodedYCbCr, PixelsOut, tam);
 
-    // 3. Abre e escreve o arquivo BMP de saída
+    // 4. Abre e escreve o arquivo BMP de saída
     FILE *output = fopen("out.bmp", "wb");
     if (!output) {
         printf("Error: could not open output file.\n");
