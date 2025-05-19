@@ -34,7 +34,7 @@ void extract_block_y(PIXELYCBCR *image, float block[8][8], int start_x, int star
             int px = padding_clamp(start_x + x, width);
             int py = padding_clamp(start_y + y, height);
             int index = py * width + px;
-            block[y][x] = (float)image[index].Y;
+            block[y][x] = (float)image[index].Y - 128.0f; // Subtrai 128 para centralizar os valores
         }
     }
 }
@@ -52,14 +52,13 @@ void extract_block_chroma420(PIXELYCBCR *image, float block[8][8], int start_x, 
      */
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
-            // A subamostragem é feita pegando a média dos 4 pixels 2x2
             float sum = 0;
             for (int dy = 0; dy < 2; dy++) {
                 for (int dx = 0; dx < 2; dx++) {
                     int px = padding_clamp(start_x + x * 2 + dx, width);
                     int py = padding_clamp(start_y + y * 2 + dy, height);
                     int index = py * width + px;
-                    sum += (channel == 'B') ? image[index].Cb : image[index].Cr;
+                    sum += ((channel == 'B') ? image[index].Cb : image[index].Cr) - 128.0f; // Subtrai 128 para centralizar os valores
                 }
             }
             block[y][x] = sum / 4.0f;
@@ -77,13 +76,13 @@ void reconstructBlock8x8_Y(PIXELYCBCR *dst, float block[8][8], int start_x, int 
      * start_x, start_y: coordenada x e y do pixel inicial
      * width, height: largura e altura da imagem
      */
-    for (int y = 0; y < 8; y++)
+    for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
             int px = padding_clamp(start_x + x, width);
             int py = padding_clamp(start_y + y, height);
-            // utiliza-se clamping para evitar overflow
-            dst[py * width + px].Y = (unsigned char)(clamp(block[y][x] + 0.5f, 0.0f, 255.0f));
+            dst[py * width + px].Y = (unsigned char)(clamp(block[y][x] + 128.5f, 0.0f, 255.0f)); // Adiciona 128 para reverter a centralização
         }
+    }
 }
 
 void reconstructBlock8x8_CbCr420(PIXELYCBCR *dst, float block[8][8], int start_x, int start_y, int width, int height, char channel) {
@@ -101,8 +100,7 @@ void reconstructBlock8x8_CbCr420(PIXELYCBCR *dst, float block[8][8], int start_x
         for (int x = 0; x < 16; x++) {
             int px = padding_clamp(start_x + x, width);
             int py = padding_clamp(start_y + y, height);
-            // utiliza-se clamping para evitar overflow
-            unsigned char val = (unsigned char)(clamp(block[y / 2][x / 2] + 0.5f, 0.0f, 255.0f));
+            unsigned char val = (unsigned char)(clamp(block[y / 2][x / 2] + 128.5f, 0.0f, 255.0f)); // Adiciona 128 para reverter a centralização
             PIXELYCBCR *pix = &dst[py * width + px];
             if (channel == 'B') pix->Cb = val;
             else pix->Cr = val;
@@ -163,7 +161,7 @@ MACROBLOCO* encodeImageYCbCr(PIXELYCBCR *image, int width, int height, int *out_
     return macroblocks;
 }
 
-float quantization_matrix_y[8][8] = {
+float base_quantization_matrix_y[8][8] = {
     {16, 11, 10, 16, 24, 40, 51, 61},
     {12, 12, 14, 19, 26, 58, 60, 55},
     {14, 13, 16, 24, 40, 57, 69, 56},
@@ -174,7 +172,7 @@ float quantization_matrix_y[8][8] = {
     {72,92 ,95 ,98 ,112 ,100 ,103 ,99}
 };
 
-float quantization_matrix_chroma[8][8] = {
+float base_quantization_matrix_chroma[8][8] = {
     {17, 18, 24, 47, 99, 99, 99, 99},
     {18, 21, 26, 66, 99, 99, 99, 99},
     {24, 26, 56, 99, 99, 99, 99, 99},
@@ -185,7 +183,7 @@ float quantization_matrix_chroma[8][8] = {
     {99 ,99 ,99 ,99 ,99 ,99 ,99 ,98}
 };
 
-void quantizeBlock(float block[8][8], float quantization_matrix[8][8], int compression_factor) {
+void quantizeBlock(float block[8][8], float quantization_matrix[8][8]) {
     /*
      * Aplica a quantização em um bloco 8x8 usando uma matriz de quantização.
      *
@@ -197,12 +195,12 @@ void quantizeBlock(float block[8][8], float quantization_matrix[8][8], int compr
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
             // Aplica a quantização
-            block[y][x] = round(block[y][x] / (quantization_matrix[y][x] * compression_factor));
+            block[y][x] = round(block[y][x] / quantization_matrix[y][x]);
         }
     }
 }
 
-void dequantizeBlock(float block[8][8], float quantization_matrix[8][8], int compression_factor) {
+void dequantizeBlock(float block[8][8], float quantization_matrix[8][8]) {
     /*
      * Aplica a dequantização em um bloco 8x8 usando uma matriz de quantização.
      *
@@ -214,12 +212,12 @@ void dequantizeBlock(float block[8][8], float quantization_matrix[8][8], int com
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
             // Aplica a dequantização
-            block[y][x] *= (quantization_matrix[y][x] * compression_factor);
+            block[y][x] *= quantization_matrix[y][x];
         }
     }
 }
 
-void quantizeMacroblock(MACROBLOCO *mb, int compression_factor) {
+void quantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], float quantization_matrix_chroma[8][8]) {
     /*
      * Aplica a quantização em um macrobloco 16x16.
      *
@@ -229,13 +227,13 @@ void quantizeMacroblock(MACROBLOCO *mb, int compression_factor) {
      * compression_factor: fator de compressão
      */
     for (int i = 0; i < 4; i++) {
-        quantizeBlock(mb->Y[i].Y, quantization_matrix_y, compression_factor);
+        quantizeBlock(mb->Y[i].Y, quantization_matrix_y);
     }
-    quantizeBlock(mb->Cb.C, quantization_matrix_chroma, compression_factor);
-    quantizeBlock(mb->Cr.C, quantization_matrix_chroma, compression_factor);
+    quantizeBlock(mb->Cb.C, quantization_matrix_chroma);
+    quantizeBlock(mb->Cr.C, quantization_matrix_chroma);
 }
 
-void dequantizeMacroblock(MACROBLOCO *mb, int compression_factor) {
+void dequantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], float quantization_matrix_chroma[8][8]) {
     /*
      * Aplica a dequantização em um macrobloco 16x16.
      *
@@ -245,13 +243,13 @@ void dequantizeMacroblock(MACROBLOCO *mb, int compression_factor) {
      * compression_factor: fator de compressão
      */
     for (int i = 0; i < 4; i++) {
-        dequantizeBlock(mb->Y[i].Y, quantization_matrix_y, compression_factor);
+        dequantizeBlock(mb->Y[i].Y, quantization_matrix_y);
     }
-    dequantizeBlock(mb->Cb.C, quantization_matrix_chroma, compression_factor);
-    dequantizeBlock(mb->Cr.C, quantization_matrix_chroma, compression_factor);
+    dequantizeBlock(mb->Cb.C, quantization_matrix_chroma);
+    dequantizeBlock(mb->Cr.C, quantization_matrix_chroma);
 }
 
-void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int compression_factor) {
+void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality) {
     /*
      * Aplica a quantização em um vetor de macroblocos.
      *
@@ -260,11 +258,22 @@ void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int compres
      * macroblock_count: número de macroblocos
      * compression_factor: fator de compressão
      */
+    float quantization_matrix_y[8][8], quantization_matrix_chroma[8][8], multiplier;
+    multiplier = quality < 50 ? 5000/quality : (200 - 2*quality);
+
+    // Preenche as matrizes de quantização com os valores base multiplicados pelo fator de compressão
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * multiplier + 50) / 100;
+            quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * multiplier + 50) / 100;
+        }
+    }
+
     for (int i = 0; i < macroblock_count; i++) {
-        quantizeMacroblock(&mb_array[i], compression_factor);
+        quantizeMacroblock(&mb_array[i], quantization_matrix_y, quantization_matrix_chroma);
     }
 }
-void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int compression_factor) {
+void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality) {
     /*
      * Aplica a dequantização em um vetor de macroblocos.
      *
@@ -273,8 +282,19 @@ void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int compr
      * macroblock_count: número de macroblocos
      * compression_factor: fator de compressão
      */
+    float quantization_matrix_y[8][8], quantization_matrix_chroma[8][8], multiplier;
+    multiplier = quality < 50 ? 5000/quality : (200 - 2*quality);
+
+    // Preenche as matrizes de quantização com os valores base multiplicados pelo fator de compressão
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * multiplier + 50) / 100;
+            quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * multiplier + 50) / 100;
+        }
+    }
+
     for (int i = 0; i < macroblock_count; i++) {
-        dequantizeMacroblock(&mb_array[i], compression_factor);
+        dequantizeMacroblock(&mb_array[i], quantization_matrix_y, quantization_matrix_chroma);
     }
 }
 

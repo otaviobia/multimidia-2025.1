@@ -27,7 +27,7 @@
     void extract_block_chroma420(PIXELYCBCR *image, float block[8][8], int start_x, int start_y, int width, int height, char channel);
     void reconstructBlock8x8_Y(PIXELYCBCR *dst, float block[8][8], int start_x, int start_y, int width, int height);
     void reconstructBlock8x8_CbCr420(PIXELYCBCR *dst, float block[8][8], int start_x, int start_y, int width, int height, char channel);
-    void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int compression_factor);
-    void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int compression_factor);
+    void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality);
+    void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality);
 
 #endif

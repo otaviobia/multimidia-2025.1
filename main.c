@@ -8,7 +8,7 @@
 
 int main(void) {
     /* COMPRESSÃO */
-    float factor = 1.0f; // Fator de compressão
+    float quality = 100; // Qualidade da quantização (50 é o padrão)
 
     // 1. Abre o arquivo BMP de entrada
     FILE *input = fopen("images/cameraman.bmp", "rb");
@@ -25,6 +25,11 @@ int main(void) {
     // 3. Calcula a quantidade de pixels da imagem
     int width = InfoHeader.Width;
     int height = InfoHeader.Height;
+    if (width % 8 != 0 || height % 8 != 0) {
+        printf("Error: image dimensions must be multiples of 8.\n");
+        fclose(input);
+        return 1;
+    }
     int tam = width * height;
 
     // 4. Aloca memória para os pixels de entrada e saída e lê os pixels do arquivo BMP
@@ -48,11 +53,11 @@ int main(void) {
     printf("Number of macroblocks: %d\n", macroblock_count);
 
     // 7. Aplica a quantização nos macroblocos
-    quantizeMacroblocks(blocks, macroblock_count, factor);
+    quantizeMacroblocks(blocks, macroblock_count, quality);
 
     /* DESCOMPRESSÃO */
     // 1. Aplica a dequantização nos macroblocos
-    dequantizeMacroblocks(blocks, macroblock_count, factor);
+    dequantizeMacroblocks(blocks, macroblock_count, quality);
 
     // 2. Gera a imagem YCbCr a partir dos macroblocos
     PIXELYCBCR *DecodedYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
