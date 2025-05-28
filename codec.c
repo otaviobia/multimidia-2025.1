@@ -145,7 +145,7 @@ MACROBLOCO* encodeImageYCbCr(PIXELYCBCR *image, int width, int height, int *out_
 
                 float y_temp[8][8];
                 extract_block_y(image, y_temp, ox, oy, width, height);
-                forwardDCTMatrix(y_temp, mb->Y[i].Y);
+                forwardDCTMatrix(y_temp, mb->Y[i].block);
             }
 
             // Extrai e aplica DCT para os blocos Cb e Cr
@@ -153,8 +153,8 @@ MACROBLOCO* encodeImageYCbCr(PIXELYCBCR *image, int width, int height, int *out_
             extract_block_chroma420(image, cb_temp, bx, by, width, height, 'B');
             extract_block_chroma420(image, cr_temp, bx, by, width, height, 'R');
             
-            forwardDCTMatrix(cb_temp, mb->Cb.C);
-            forwardDCTMatrix(cr_temp, mb->Cr.C);
+            forwardDCTMatrix(cb_temp, mb->Cb.block);
+            forwardDCTMatrix(cr_temp, mb->Cr.block);
         }
     }
 
@@ -227,10 +227,10 @@ void quantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], float
      * compression_factor: fator de compressão
      */
     for (int i = 0; i < 4; i++) {
-        quantizeBlock(mb->Y[i].Y, quantization_matrix_y);
+        quantizeBlock(mb->Y[i].block, quantization_matrix_y);
     }
-    quantizeBlock(mb->Cb.C, quantization_matrix_chroma);
-    quantizeBlock(mb->Cr.C, quantization_matrix_chroma);
+    quantizeBlock(mb->Cb.block, quantization_matrix_chroma);
+    quantizeBlock(mb->Cr.block, quantization_matrix_chroma);
 }
 
 void dequantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], float quantization_matrix_chroma[8][8]) {
@@ -243,10 +243,10 @@ void dequantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], flo
      * compression_factor: fator de compressão
      */
     for (int i = 0; i < 4; i++) {
-        dequantizeBlock(mb->Y[i].Y, quantization_matrix_y);
+        dequantizeBlock(mb->Y[i].block, quantization_matrix_y);
     }
-    dequantizeBlock(mb->Cb.C, quantization_matrix_chroma);
-    dequantizeBlock(mb->Cr.C, quantization_matrix_chroma);
+    dequantizeBlock(mb->Cb.block, quantization_matrix_chroma);
+    dequantizeBlock(mb->Cr.block, quantization_matrix_chroma);
 }
 
 void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality) {
@@ -321,17 +321,83 @@ void decodeImageYCbCr(MACROBLOCO *mb_array, PIXELYCBCR *dst, int width, int heig
                 int by = y + (i / 2) * 8;
 
                 float rec[8][8] = {0};
-                inverseDCTMatrix(mb->Y[i].Y, rec);
+                inverseDCTMatrix(mb->Y[i].block, rec);
                 reconstructBlock8x8_Y(dst, rec, bx, by, width, height);
             }
 
             // Reconstrói os blocos Cb e Cr
             float cb_rec[8][8] = {0}, cr_rec[8][8] = {0};
-            inverseDCTMatrix(mb->Cb.C, cb_rec);
-            inverseDCTMatrix(mb->Cr.C, cr_rec);
+            inverseDCTMatrix(mb->Cb.block, cb_rec);
+            inverseDCTMatrix(mb->Cr.block, cr_rec);
 
             reconstructBlock8x8_CbCr420(dst, cb_rec, x, y, width, height, 'B');
             reconstructBlock8x8_CbCr420(dst, cr_rec, x, y, width, height, 'R');
         }
+    }
+}
+
+void vectorize_block(float block[8][8], VETORZIGZAG *return_vector) {
+    int zigzag[64][2] = {
+        {0,0},{0,1},{1,0},{2,0},{1,1},{0,2},{0,3},{1,2},
+        {2,1},{3,0},{4,0},{3,1},{2,2},{1,3},{0,4},{0,5},
+        {1,4},{2,3},{3,2},{4,1},{5,0},{6,0},{5,1},{4,2},
+        {3,3},{2,4},{1,5},{0,6},{0,7},{1,6},{2,5},{3,4},
+        {4,3},{5,2},{6,1},{7,0},{7,1},{6,2},{5,3},{4,4},
+        {3,5},{2,6},{1,7},{2,7},{3,6},{4,5},{5,4},{6,3},
+        {7,2},{7,3},{6,4},{5,5},{4,6},{3,7},{4,7},{5,6},
+        {6,5},{7,4},{7,5},{6,6},{5,7},{6,7},{7,6},{7,7}
+    };
+
+    for (int i = 0; i < 64; i++) {
+        int row = zigzag[i][0];
+        int col = zigzag[i][1];
+        return_vector->vector[i] = block[row][col];
+    }
+}
+
+void vectorize_macroblock(MACROBLOCO *macroblock, MACROBLOCO_VETORIZADO *vetorizado) {
+    for (int i = 0; i < 4; i++)
+        vectorize_block(macroblock->Y[i].block, &vetorizado->Y_vetor[i]);
+
+    vectorize_block(macroblock->Cb.block, &vetorizado->Cb_vetor);
+    vectorize_block(macroblock->Cr.block, &vetorizado->Cr_vetor);
+}
+
+void vectorize_macroblocks(MACROBLOCO *macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count) {
+    for (int i = 0; i < macroblock_count; i++) {
+        vectorize_macroblock(&macroblocks[i], &vectorized_macroblocks[i]);
+    }
+}
+
+void devectorize_block(VETORZIGZAG *vector, float block[8][8]) {
+    int zigzag[64][2] = {
+        {0,0},{0,1},{1,0},{2,0},{1,1},{0,2},{0,3},{1,2},
+        {2,1},{3,0},{4,0},{3,1},{2,2},{1,3},{0,4},{0,5},
+        {1,4},{2,3},{3,2},{4,1},{5,0},{6,0},{5,1},{4,2},
+        {3,3},{2,4},{1,5},{0,6},{0,7},{1,6},{2,5},{3,4},
+        {4,3},{5,2},{6,1},{7,0},{7,1},{6,2},{5,3},{4,4},
+        {3,5},{2,6},{1,7},{2,7},{3,6},{4,5},{5,4},{6,3},
+        {7,2},{7,3},{6,4},{5,5},{4,6},{3,7},{4,7},{5,6},
+        {6,5},{7,4},{7,5},{6,6},{5,7},{6,7},{7,6},{7,7}
+    };
+
+    for (int i = 0; i < 64; i++) {
+        int row = zigzag[i][0];
+        int col = zigzag[i][1];
+        block[row][col] = vector->vector[i];
+    }
+}
+
+void devectorize_macroblock(MACROBLOCO_VETORIZADO *vetorizado, MACROBLOCO *macroblock) {
+    for (int i = 0; i < 4; i++)
+        devectorize_block(&vetorizado->Y_vetor[i], macroblock->Y[i].block);
+
+    devectorize_block(&vetorizado->Cb_vetor, macroblock->Cb.block);
+    devectorize_block(&vetorizado->Cr_vetor, macroblock->Cr.block);
+}
+
+void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO *macroblocks, int macroblock_count) {
+    for (int i = 0; i < macroblock_count; i++) {
+        devectorize_macroblock(&vectorized_macroblocks[i], &macroblocks[i]);
     }
 }

@@ -8,7 +8,7 @@
 
 int main(void) {
     /* COMPRESSÃO */
-    float quality = 100; // Qualidade da quantização (50 é o padrão)
+    float quality = 50; // Qualidade da quantização (50 é o padrão)
 
     // 1. Abre o arquivo BMP de entrada
     FILE *input = fopen("images/cameraman.bmp", "rb");
@@ -49,24 +49,31 @@ int main(void) {
     // 6. Aplica a DCT e retorna os macroblocos de 16x16
     // Essa função também faz a subamostragem 4:2:0
     int macroblock_count = 0;
-    MACROBLOCO *blocks = encodeImageYCbCr(PixelsYCbCr, width, height, &macroblock_count);
+    MACROBLOCO *macroblocks = encodeImageYCbCr(PixelsYCbCr, width, height, &macroblock_count);
     printf("Number of macroblocks: %d\n", macroblock_count);
 
     // 7. Aplica a quantização nos macroblocos
-    quantizeMacroblocks(blocks, macroblock_count, quality);
+    quantizeMacroblocks(macroblocks, macroblock_count, quality);
+
+    MACROBLOCO_VETORIZADO* vectorized_macroblocks = (MACROBLOCO_VETORIZADO *) malloc(macroblock_count * sizeof(MACROBLOCO_VETORIZADO));
+    vectorize_macroblocks(macroblocks, vectorized_macroblocks, macroblock_count);
 
     /* DESCOMPRESSÃO */
-    // 1. Aplica a dequantização nos macroblocos
-    dequantizeMacroblocks(blocks, macroblock_count, quality);
+    // 1. Desvetoriza os macroblocos
+    MACROBLOCO *new_macroblocks = (MACROBLOCO *)malloc(macroblock_count * sizeof(MACROBLOCO));
+    devectorize_macroblocks(vectorized_macroblocks, new_macroblocks, macroblock_count);
 
-    // 2. Gera a imagem YCbCr a partir dos macroblocos
+    // 2. Aplica a dequantização nos macroblocos
+    dequantizeMacroblocks(new_macroblocks, macroblock_count, quality);
+
+    // 3. Gera a imagem YCbCr a partir dos macroblocos
     PIXELYCBCR *DecodedYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
-    decodeImageYCbCr(blocks, DecodedYCbCr, width, height);
+    decodeImageYCbCr(new_macroblocks, DecodedYCbCr, width, height);
 
-    // 3. Converte os pixels de YCbCr para RGB
+    // 4. Converte os pixels de YCbCr para RGB
     convertToRGB(DecodedYCbCr, PixelsOut, tam);
 
-    // 4. Abre e escreve o arquivo BMP de saída
+    // 5. Abre e escreve o arquivo BMP de saída
     FILE *output = fopen("out.bmp", "wb");
     if (!output) {
         printf("Error: could not open output file.\n");
@@ -81,7 +88,8 @@ int main(void) {
     free(PixelsOut);
     free(PixelsYCbCr);
     free(DecodedYCbCr);
-    free(blocks);
+    free(macroblocks);
+    free(vectorized_macroblocks);
 
     // Sai do programa
     printf("Image processed and saved to out.bmp\n");
