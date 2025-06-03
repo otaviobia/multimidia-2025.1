@@ -8,10 +8,8 @@
 
 int main(void) {
     /* COMPRESSÃO */
-    float quality = 50; // Qualidade da quantização (50 é o padrão)
 
     // 1. Abre o arquivo BMP de entrada
-    FILE *input = fopen("images/cameraman.bmp", "rb");
     if (!input) {
         printf("Error: could not open input file.\n");
         return 1;
@@ -55,25 +53,34 @@ int main(void) {
     // 7. Aplica a quantização nos macroblocos
     quantizeMacroblocks(macroblocks, macroblock_count, quality);
 
+    // 8. Aplica vetorização zig-zag
     MACROBLOCO_VETORIZADO* vectorized_macroblocks = (MACROBLOCO_VETORIZADO *) malloc(macroblock_count * sizeof(MACROBLOCO_VETORIZADO));
     vectorize_macroblocks(macroblocks, vectorized_macroblocks, macroblock_count);
 
-    /* DESCOMPRESSÃO */
-    // 1. Desvetoriza os macroblocos
-    MACROBLOCO *new_macroblocks = (MACROBLOCO *)malloc(macroblock_count * sizeof(MACROBLOCO));
-    devectorize_macroblocks(vectorized_macroblocks, new_macroblocks, macroblock_count);
+    // 9. Aplica codificação por carreira para os coeficientes AC
+    MACROBLOCO_RLE* rle_macroblocks = (MACROBLOCO_RLE *) malloc(macroblock_count * sizeof(MACROBLOCO_RLE));
+    rle_encode_macroblocks(rle_macroblocks, vectorized_macroblocks, macroblock_count);
 
-    // 2. Aplica a dequantização nos macroblocos
+    /* DESCOMPRESSÃO */
+    // 1. Desaplica codificação por carreira
+    MACROBLOCO_VETORIZADO* new_vectorized_macroblocks = (MACROBLOCO_VETORIZADO *) malloc(macroblock_count * sizeof(MACROBLOCO_VETORIZADO));
+    rle_decode_macroblocks(new_vectorized_macroblocks, rle_macroblocks, macroblock_count);
+
+    // 2. Desvetoriza os macroblocos
+    MACROBLOCO *new_macroblocks = (MACROBLOCO *)malloc(macroblock_count * sizeof(MACROBLOCO));
+    devectorize_macroblocks(new_vectorized_macroblocks, new_macroblocks, macroblock_count);
+
+    // 3. Aplica a dequantização nos macroblocos
     dequantizeMacroblocks(new_macroblocks, macroblock_count, quality);
 
-    // 3. Gera a imagem YCbCr a partir dos macroblocos
+    // 4. Gera a imagem YCbCr a partir dos macroblocos
     PIXELYCBCR *DecodedYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
     decodeImageYCbCr(new_macroblocks, DecodedYCbCr, width, height);
 
-    // 4. Converte os pixels de YCbCr para RGB
+    // 5. Converte os pixels de YCbCr para RGB
     convertToRGB(DecodedYCbCr, PixelsOut, tam);
 
-    // 5. Abre e escreve o arquivo BMP de saída
+    // 6. Abre e escreve o arquivo BMP de saída
     FILE *output = fopen("out.bmp", "wb");
     if (!output) {
         printf("Error: could not open output file.\n");
@@ -90,6 +97,9 @@ int main(void) {
     free(DecodedYCbCr);
     free(macroblocks);
     free(vectorized_macroblocks);
+    free(rle_macroblocks);
+    free(new_vectorized_macroblocks);
+    free(new_macroblocks);
 
     // Sai do programa
     printf("Image processed and saved to out.bmp\n");

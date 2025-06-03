@@ -23,6 +23,22 @@
         BLOCO Y[4], Cb, Cr;
     } MACROBLOCO;
 
+    // Estrutura que representa um par do Run-length Encoding
+    typedef struct {
+        int zeros; // Número de zeros antes do coeficiente não-zero
+        float valor;    // Valor do coeficiente não-zero (ou 0.0 para representar EOB)
+    } PAR_RLE;
+
+    typedef struct {
+        float coeficiente_dc;
+        PAR_RLE pares[64]; // Tamanho no pior caso
+        int quantidade; // Quantidade real de pares
+    } BLOCO_RLE;
+
+    typedef struct {
+        BLOCO_RLE Y_vetor[4], Cb_vetor, Cr_vetor;
+    } MACROBLOCO_RLE;
+
     MACROBLOCO* encodeImageYCbCr(PIXELYCBCR *image, int width, int height, int *out_macroblock_count);
     void decodeImageYCbCr(MACROBLOCO *mb_array, PIXELYCBCR *dst, int width, int height);
     void extract_block_y(PIXELYCBCR *image, float block[8][8], int start_x, int start_y, int width, int height);
@@ -33,5 +49,7 @@
     void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality);
     void vectorize_macroblocks(MACROBLOCO *macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);
     void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO *macroblocks, int macroblock_count);
+    void rle_encode_macroblocks(MACROBLOCO_RLE *rle_macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);
+    void rle_decode_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO_RLE *rle_macroblocks, int macroblock_count);
 
 #endif
