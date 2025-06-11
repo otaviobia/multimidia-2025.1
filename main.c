@@ -91,6 +91,8 @@ int main(void) {
     free(macroblocks);
     free(vectorized_macroblocks);
 
+    testVectorization();
+
     // Sai do programa
     printf("Image processed and saved to out.bmp\n");
     return 0;
