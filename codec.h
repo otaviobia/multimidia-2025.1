@@ -33,5 +33,6 @@
     void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality);
     void vectorize_macroblocks(MACROBLOCO *macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);
     void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO *macroblocks, int macroblock_count);
-
+    void vectorize_block(float block[8][8], VETORZIGZAG *return_vector);
+    void devectorize_block(VETORZIGZAG *vector, float block[8][8]);
 #endif

@@ -323,3 +323,69 @@ void testImageWithoutDCT(PIXELYCBCR *image, int width, int height, BITMAPFILEHEA
     free(recon);
     free(reconRGB);
 }
+
+void testVectorization() {
+    printf("*************** Vectorization Test ***************\n");
+    
+    // Create a test matrix with values 0-63
+    float test_block[8][8];
+    int value = 0;
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            test_block[i][j] = (float)value++;
+        }
+    }
+    
+    // Print original matrix
+    printf("Original 8x8 matrix:\n");
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            printf("%3.0f ", test_block[i][j]);
+        }
+        printf("\n");
+    }
+    
+    // Vectorize the block
+    VETORZIGZAG vector;
+    vectorize_block(test_block, &vector);
+    
+    // Print vectorized result
+    printf("\nVectorized (zigzag order):\n");
+    for (int i = 0; i < 64; i++) {
+        printf("%3.0f ", vector.vector[i]);
+        if ((i + 1) % 8 == 0) printf("\n");
+    }
+    
+    // Devectorize back to matrix
+    float reconstructed_block[8][8];
+    devectorize_block(&vector, reconstructed_block);
+    
+    // Print reconstructed matrix
+    printf("\nReconstructed 8x8 matrix:\n");
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            printf("%3.0f ", reconstructed_block[i][j]);
+        }
+        printf("\n");
+    }
+    
+    // Verify if original and reconstructed are identical
+    int errors = 0;
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            if (test_block[i][j] != reconstructed_block[i][j]) {
+                errors++;
+                printf("Error at [%d][%d]: original=%.0f, reconstructed=%.0f\n", 
+                       i, j, test_block[i][j], reconstructed_block[i][j]);
+            }
+        }
+    }
+    
+    if (errors == 0) {
+        printf("\nVectorization test PASSED - all values match!\n");
+    } else {
+        printf("\nVectorization test FAILED - %d errors found!\n", errors);
+    }
+    
+    printf("************************************************\n\n");
+}
