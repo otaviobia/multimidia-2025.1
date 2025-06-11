@@ -327,7 +327,7 @@ void testImageWithoutDCT(PIXELYCBCR *image, int width, int height, BITMAPFILEHEA
 void testVectorization() {
     printf("*************** Vectorization Test ***************\n");
     
-    // Create a test matrix with values 1-64
+    // Create a test matrix with values 0-63
     float test_block[8][8];
     int value = 0;
     for (int i = 0; i < 8; i++) {
@@ -382,9 +382,9 @@ void testVectorization() {
     }
     
     if (errors == 0) {
-        printf("\n✓ Vectorization test PASSED - all values match!\n");
+        printf("\nVectorization test PASSED - all values match!\n");
     } else {
-        printf("\n✗ Vectorization test FAILED - %d errors found!\n", errors);
+        printf("\nVectorization test FAILED - %d errors found!\n", errors);
     }
     
     printf("************************************************\n\n");
