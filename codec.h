@@ -51,5 +51,6 @@
     void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO *macroblocks, int macroblock_count);
     void rle_encode_macroblocks(MACROBLOCO_RLE *rle_macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);
     void rle_decode_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO_RLE *rle_macroblocks, int macroblock_count);
-
+    void vectorize_block(float block[8][8], VETORZIGZAG *return_vector);
+    void devectorize_block(VETORZIGZAG *vector, float block[8][8]);
 #endif
