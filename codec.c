@@ -337,6 +337,9 @@ void decodeImageYCbCr(MACROBLOCO *mb_array, PIXELYCBCR *dst, int width, int heig
 }
 
 void vectorize_block(float block[8][8], VETORZIGZAG *return_vector) {
+    /*
+     * Dado um bloco 8x8, converte em um vetor de 64 posiçöes utilizando o padrão zigue-zague.
+     */
     int zigzag[64][2] = {
         {0,0},{0,1},{1,0},{2,0},{1,1},{0,2},{0,3},{1,2},
         {2,1},{3,0},{4,0},{3,1},{2,2},{1,3},{0,4},{0,5},
@@ -356,6 +359,9 @@ void vectorize_block(float block[8][8], VETORZIGZAG *return_vector) {
 }
 
 void vectorize_macroblock(MACROBLOCO *macroblock, MACROBLOCO_VETORIZADO *vetorizado) {
+    /*
+     * Dado um macrobloco com subamostragem de crominância, converte em um macrobloco vetorizado em zigue-zague.
+     */
     for (int i = 0; i < 4; i++)
         vectorize_block(macroblock->Y[i].block, &vetorizado->Y_vetor[i]);
 
@@ -364,12 +370,18 @@ void vectorize_macroblock(MACROBLOCO *macroblock, MACROBLOCO_VETORIZADO *vetoriz
 }
 
 void vectorize_macroblocks(MACROBLOCO *macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count) {
+    /*
+     * Dado um vetor de macroblocos com subamostragem de crominância, converte em um vetor de macroblocos vetorizado em zigue-zague.
+     */
     for (int i = 0; i < macroblock_count; i++) {
         vectorize_macroblock(&macroblocks[i], &vectorized_macroblocks[i]);
     }
 }
 
 void devectorize_block(VETORZIGZAG *vector, float block[8][8]) {
+    /*
+     * Dado um vetor de 64 posiçöes, converte em um bloco 8x8 utilizando o padrão zigue-zague.
+     */
     int zigzag[64][2] = {
         {0,0},{0,1},{1,0},{2,0},{1,1},{0,2},{0,3},{1,2},
         {2,1},{3,0},{4,0},{3,1},{2,2},{1,3},{0,4},{0,5},
@@ -389,6 +401,9 @@ void devectorize_block(VETORZIGZAG *vector, float block[8][8]) {
 }
 
 void devectorize_macroblock(MACROBLOCO_VETORIZADO *vetorizado, MACROBLOCO *macroblock) {
+    /*
+     * Dado um macrobloco vetorizado em zigue-zague, converte em um macrobloco com subamostragem de crominância.
+     */
     for (int i = 0; i < 4; i++)
         devectorize_block(&vetorizado->Y_vetor[i], macroblock->Y[i].block);
 
@@ -397,7 +412,116 @@ void devectorize_macroblock(MACROBLOCO_VETORIZADO *vetorizado, MACROBLOCO *macro
 }
 
 void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO *macroblocks, int macroblock_count) {
+    /*
+     * Dado um vetor de macroblocos vetorizado em zigue-zague, converte em um vetor de macroblocos com subamostragem de crominância.
+     */
     for (int i = 0; i < macroblock_count; i++) {
         devectorize_macroblock(&vectorized_macroblocks[i], &macroblocks[i]);
+    }
+}
+
+void rle_encode_block(BLOCO_RLE* rle_block, VETORZIGZAG* zigzag_block) {
+    /*
+     * Converte um bloco vetorizado em zigue-zague em um bloco codificado por carreira.
+     */
+    rle_block->quantidade = 0;
+    int quantidade_zeros = 0;
+
+    rle_block->coeficiente_dc = zigzag_block->vector[0];
+    printf("%f\n", rle_block->coeficiente_dc);
+
+    for (int i = 1; i <= 63; i++) {
+        if (fabs(zigzag_block->vector[i]) < 0.0001f) {
+            quantidade_zeros++;
+        } else {
+            if (rle_block->quantidade < 63) {
+                 rle_block->pares[rle_block->quantidade].zeros = quantidade_zeros;
+                 rle_block->pares[rle_block->quantidade].valor = zigzag_block->vector[i];
+                 rle_block->quantidade++;
+                 quantidade_zeros = 0;
+            } else {
+                 break;
+            }
+        }
+    }
+    // Colocar EOB
+    if (rle_block->quantidade < 64) {
+        rle_block->pares[rle_block->quantidade].zeros = 0;
+        rle_block->pares[rle_block->quantidade].valor = 0.0f;
+        rle_block->quantidade++;
+    }
+}
+
+void rle_encode_macroblock(MACROBLOCO_RLE *rle_macroblock, MACROBLOCO_VETORIZADO *vectorized_macroblock) {
+    /*
+     * Converte um macrobloco vetorizado em zigue-zague em um macrobloco codificado por carreira.
+     */
+    for (int i = 0; i < 4; i++) {
+        rle_encode_block(&rle_macroblock->Y_vetor[i], &vectorized_macroblock->Y_vetor[i]);
+    }
+    rle_encode_block(&rle_macroblock->Cb_vetor, &vectorized_macroblock->Cb_vetor);
+    rle_encode_block(&rle_macroblock->Cr_vetor, &vectorized_macroblock->Cr_vetor);
+}
+
+void rle_encode_macroblocks(MACROBLOCO_RLE *rle_macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count) {
+    /*
+     * Converte um vetor de macroblocos vetorizados em zigue-zague em um vetor de macroblocos codificados por carreira.
+     */
+    for (int i = 0; i < macroblock_count; i++) {
+        rle_encode_macroblock(&rle_macroblocks[i], &vectorized_macroblocks[i]);
+    }
+}
+
+void rle_decode_block(VETORZIGZAG* zigzag_block, BLOCO_RLE* rle_block) {
+    /*
+     * Converte um bloco codificado por carreira em um bloco vetorizado em zigue-zague.
+     */
+    for (int i = 1; i <= 63; i++) {
+        zigzag_block->vector[i] = 0.0f;
+    }
+
+    zigzag_block->vector[0] = rle_block->coeficiente_dc;
+    int current_ac_idx = 1;
+
+    for (int k = 0; k < rle_block->quantidade; k++) {
+        const PAR_RLE* par_atual = &rle_block->pares[k];
+        if (par_atual->zeros == 0 && fabs(par_atual->valor) < 0.0001f) {
+            break; // EOB encontrado
+        }
+
+        for (int z = 0; z < par_atual->zeros; z++) {
+            if (current_ac_idx <= 63) {
+                current_ac_idx++;
+            } else {
+                return;
+            }
+        }
+
+        if (current_ac_idx <= 63) {
+            zigzag_block->vector[current_ac_idx] = par_atual->valor;
+            current_ac_idx++;
+        } else {
+            return;
+        }
+    }
+}
+
+void rle_decode_macroblock(MACROBLOCO_VETORIZADO *vectorized_macroblock, MACROBLOCO_RLE *rle_macroblock) {
+    /*
+     * Converte um macrobloco codificado por carreira em um macrobloco vetorizado em zigue-zague.
+     */
+    for (int i = 0; i < 4; i++) {
+        rle_decode_block(&vectorized_macroblock->Y_vetor[i], &rle_macroblock->Y_vetor[i]);
+    }
+    rle_decode_block(&vectorized_macroblock->Cb_vetor, &rle_macroblock->Cb_vetor);
+    rle_decode_block(&vectorized_macroblock->Cr_vetor, &rle_macroblock->Cr_vetor);
+}
+
+void rle_decode_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO_RLE *rle_macroblocks, int macroblock_count) {
+    /*
+     * Converte um vetor de macroblocos codificados por carreira em um vetor de macroblocos vetorizados em zigue-zague.
+     */
+    for (int i = 0; i < macroblock_count; i++) {
+        rle_decode_macroblock(&vectorized_macroblocks[i], &rle_macroblocks[i]);
     }
 }
