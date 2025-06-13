@@ -1,7 +1,15 @@
 #include "test.h"
 
 void compareRGB(const PIXELRGB *orig, const PIXELRGB *recon, int tam) {
-    
+    /*
+     * Compara duas imagens RGB pixel a pixel e contabiliza as diferenças.
+     * Imprime estatísticas das diferenças encontradas.
+     *
+     * Parâmetros:
+     * orig: ponteiro para a imagem RGB original
+     * recon: ponteiro para a imagem RGB reconstruída
+     * tam: quantidade de pixels nas imagens
+     */   
     int cont = 0;
     int diff = 2;
     int biggestR = 0;
@@ -31,6 +39,14 @@ void compareRGB(const PIXELRGB *orig, const PIXELRGB *recon, int tam) {
 }
 
 void compareBlock(const float Block[8][8], const float RecBlock[8][8]) {
+    /*
+     * Compara dois blocos 8x8 de valores em ponto flutuante.
+     * Imprime estatísticas das diferenças encontradas.
+     *
+     * Parâmetros:
+     * Block: bloco original 8x8
+     * RecBlock: bloco reconstruído 8x8 
+     */
     int diffCont = 0; 
     float maxDiff = 0.0f; 
     float diff = 0.01f; 
@@ -57,6 +73,14 @@ void compareBlock(const float Block[8][8], const float RecBlock[8][8]) {
 }
 
 void DCTBenchComparison(const float Dctfrequencies0[8][8], const float Dctfrequencies1[8][8], const float reconstructedBlock0[8][8], const float reconstructedBlock1[8][8]) {
+    /*
+     * Compara dois algoritmos de dct para verificar se produzem resultados equivalentes.
+     * Imprime estatísticas das diferenças encontradas.
+     *
+     * Parâmetros:
+     * Block: bloco original 8x8
+     * RecBlock: bloco reconstruído 8x8 
+     */
     int diffcont= 0; // count of diff in dct
     int diffcontRec = 0; // Count of diff in idct
     float maxDiffDCT = 0.0f; // Max diff in dct
@@ -98,6 +122,18 @@ void DCTBenchComparison(const float Dctfrequencies0[8][8], const float Dctfreque
 }
 
 int compareYBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x, int start_y, int width, int height) {
+    /*
+     * Compara um bloco 8x8 do canal Y entre duas imagens YCbCr.
+     * 
+     * Parâmetros:
+     * orig: imagem YCbCr original
+     * recon: imagem YCbCr reconstruída
+     * start_x, start_y: coordenadas iniciais do bloco
+     * width, height: dimensões da imagem
+     * 
+     * Retorno:
+     * 0 se não houver diferenças, 1 caso contrário || retorna o biggest diff (a depender do teste)
+     */
     int cont = 0;
     int diff = 2;
     int biggestDiff = 0;
@@ -128,6 +164,19 @@ int compareYBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x, 
 }
 
 int compareCbCrBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x, int start_y, int width, int height) {
+    /*
+     * Compara um bloco 16x16 dos canais Cb e Cr entre duas imagens YCbCr.
+     * 
+     * Parâmetros:
+     * orig: imagem YCbCr original
+     * recon: imagem YCbCr reconstruída
+     * start_x, start_y: coordenadas iniciais do bloco
+     * width, height: dimensões da imagem
+     * 
+     * Retorno:
+     * 0 se não houver diferenças, 1 caso contrário || retorna o biggest diff (a depender do teste)
+     */
+
     int contCb = 0, contCr = 0;
     int diff = 2;
     int biggestCb = 0, biggestCr = 0;
@@ -163,6 +212,16 @@ int compareCbCrBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_
 }
 
 void testImageSubsampling(PIXELYCBCR *image, int width, int height) {
+    /*
+     * Testa o processo de subamostragem e reconstrução de uma imagem YCbCr.
+     * Para cada macrobloco 16x16, extrai e reconstrói os canais Y, Cb e Cr,
+     * comparando com a imagem original.
+     * 
+     * Parâmetros:
+     * image: imagem YCbCr a ser testada
+     * width, height: dimensões da imagem
+     */
+
     // Create empty image for reconstruction
     PIXELYCBCR *recon = (PIXELYCBCR *)malloc(width * height * sizeof(PIXELYCBCR));
     // Initialize reconstruction buffer to zeros
@@ -214,6 +273,16 @@ void testImageSubsampling(PIXELYCBCR *image, int width, int height) {
 }
 
 void saveChannelImages(PIXELYCBCR *pixels, int width, int height, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader) {
+    /*
+     * Salva cada canal (Y, Cb, Cr) da imagem YCbCr como uma imagem BMP separada.
+     * Útil para debug visual dos canais individuais.
+     * 
+     * Parâmetros:
+     * pixels: imagem YCbCr de entrada
+     * width, height: dimensões da imagem
+     * FileHeader: cabeçalho de arquivo BMP
+     * InfoHeader: cabeçalho de informação BMP
+     */
     int size = width * height;
     PIXELRGB *tempPixels = (PIXELRGB*)malloc(size * sizeof(PIXELRGB));
     
@@ -267,6 +336,16 @@ void saveChannelImages(PIXELYCBCR *pixels, int width, int height, BITMAPFILEHEAD
 }
 
 void testImageWithoutDCT(PIXELYCBCR *image, int width, int height, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader) {
+    /*
+     * Testa o processo de extração e reconstrução de blocos sem aplicar DCT.
+     * Isola os problemas de processamento de blocos dos problemas relacionados à DCT.
+     * 
+     * Parâmetros:
+     * image: imagem YCbCr original
+     * width, height: dimensões da imagem
+     * FileHeader: cabeçalho de arquivo BMP
+     * InfoHeader: cabeçalho de informação BMP
+     */
     printf("*************** Teste Sem DCT ***************\n");
     
     // Cria imagem temporária para a reconstrução
@@ -325,6 +404,11 @@ void testImageWithoutDCT(PIXELYCBCR *image, int width, int height, BITMAPFILEHEA
 }
 
 void testVectorization() {
+    /*
+     * Testa a vetorização em zigue-zague de um bloco 8x8 e sua desvetorização.
+     * Cria uma matriz de teste com valores 0-63 em ordem linear, vetoriza usando o padrão
+     * zigue-zague, e depois desvetoriza para verificar a corretude da implementação.
+     */
     printf("*************** Vectorization Test ***************\n");
     
     // Create a test matrix with values 0-63
