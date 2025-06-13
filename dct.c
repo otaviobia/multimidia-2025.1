@@ -2,6 +2,12 @@
 #define M_PI 3.14159265358979323846
 
 void precomputeCosines(float cosTable[8][8]) {
+    /*
+     * Pré-calcula os valores de cosseno necessários para a DCT.
+     *
+     * Parâmetros:
+     * cosTable: matriz 8x8 onde serão armazenados os valores de cosseno
+     */
     const double fac = M_PI / 16.0;
 
     for(int u = 0; u < 8; u++){        // u = i or j
@@ -12,6 +18,13 @@ void precomputeCosines(float cosTable[8][8]) {
 }
 
 void precomputeTransformation(float C[8][8]) {
+    /*
+     * Pré-calcula a matriz de transformação C para uso na DCT.
+     * Aplica os fatores de normalização adequados aos valores de cosseno.
+     *
+     * Parâmetros:
+     * C: matriz 8x8 de transformação a ser preenchida
+     */
     float cosTable[8][8];
     precomputeCosines(cosTable);
 
@@ -27,8 +40,18 @@ void precomputeTransformation(float C[8][8]) {
 }
 
 void forwardDCT(float block[8][8], float Dctfrequencies[8][8]) {
+    /*
+     * Implementação direta da DCT (Transformada Discreta de Cosseno) usando a fórmula matemática.
+     * Transforma um bloco do domínio espacial para o domínio de frequência.
+     *
+     * Parâmetros:
+     * block: bloco 8x8 no domínio espacial (entrada)
+     * Dctfrequencies: bloco 8x8 no domínio de frequência (saída)
+     */
+    // Inicializa a matriz de destino com zeros
+    memset(Dctfrequencies, 0, sizeof(float) * 64);
+    
     float C[8] = {1.0/sqrt(2),1.0,1.0,1.0,1.0,1.0,1.0,1.0};
-
     double sum;
     float cosTable[8][8];
     precomputeCosines(cosTable);
@@ -47,8 +70,18 @@ void forwardDCT(float block[8][8], float Dctfrequencies[8][8]) {
 }
 
 void inverseDCT(float Dctfrequencies[8][8], float block[8][8]) {
+    /*
+     * Implementação direta da IDCT (Transformada Discreta de Cosseno Inversa) usando a fórmula matemática.
+     * Transforma um bloco do domínio de frequência de volta para o domínio espacial.
+     *
+     * Parâmetros:
+     * Dctfrequencies: bloco 8x8 no domínio de frequência (entrada)
+     * block: bloco 8x8 no domínio espacial (saída)
+     */
+    // Inicializa a matriz de destino com zeros
+    memset(block, 0, sizeof(float) * 64);
+    
     float C[8] = {1.0/sqrt(2),1.0,1.0,1.0,1.0,1.0,1.0,1.0};
-
     double sum;
     float cosTable[8][8];
     precomputeCosines(cosTable);
@@ -66,6 +99,14 @@ void inverseDCT(float Dctfrequencies[8][8], float block[8][8]) {
     }
 }
 void MatrixMul(float A[8][8], float B[8][8], float Dest[8][8]) {
+    /*
+     * Multiplica duas matrizes 8x8 (A * B) e armazena o resultado em Dest.
+     *
+     * Parâmetros:
+     * A: primeira matriz 8x8
+     * B: segunda matriz 8x8
+     * Dest: matriz 8x8 de destino para o resultado
+     */
     memset(Dest, 0, sizeof(float) * 64);
     for (int i = 0; i < 8; i++) { // loop over rows of A
         for (int j = 0; j < 8; j++) { // loop over columns of B
@@ -78,6 +119,15 @@ void MatrixMul(float A[8][8], float B[8][8], float Dest[8][8]) {
 }
 
 void MatrixMulSecTransp(float A[8][8], float B[8][8], float Dest[8][8]) {
+    /*
+     * Multiplica matriz A pela transposta da matriz B (A * B^T) e armazena o resultado em Dest.
+     *
+     * Parâmetros:
+     * A: primeira matriz 8x8
+     * B: segunda matriz 8x8 (será transposta)
+     * Dest: matriz 8x8 de destino para o resultado
+     */
+    memset(Dest, 0, sizeof(float) * 64);
     for (int i = 0; i < 8; i++) { // loop over rows of A	
         for (int j = 0; j < 8; j++) { // loop over rows of B
             for(int k = 0; k < 8; k++) { // Loop over columns of A and B^T
@@ -88,6 +138,15 @@ void MatrixMulSecTransp(float A[8][8], float B[8][8], float Dest[8][8]) {
 }
 
 void MatrixMulFirstTransp(float A[8][8], float B[8][8], float Dest[8][8]) {
+    /*
+     * Multiplica a transposta da matriz A pela matriz B (A^T * B) e armazena o resultado em Dest.
+     *
+     * Parâmetros:
+     * A: primeira matriz 8x8 (será transposta)
+     * B: segunda matriz 8x8
+     * Dest: matriz 8x8 de destino para o resultado
+     */
+    memset(Dest, 0, sizeof(float) * 64);
     for (int i = 0; i < 8; i++) { // loop over rows of A	
         for (int j = 0; j < 8; j++) { // loop over rows of B
             for(int k = 0; k < 8; k++) { // Loop over columns of A^t and B
@@ -98,6 +157,13 @@ void MatrixMulFirstTransp(float A[8][8], float B[8][8], float Dest[8][8]) {
 }
 
 void forwardDCTMatrix(float block[8][8], float Dctfrequencies[8][8]) {
+    /*
+     * Aplica a Transformada Discreta de Cosseno (DCT) em um bloco 8x8 usando multiplicação de matrizes.
+     *
+     * Parâmetros:
+     * block: bloco 8x8 no domínio espacial (entrada)
+     * Dctfrequencies: bloco 8x8 no domínio de frequência (saída)
+     */
     memset(Dctfrequencies, 0, sizeof(float) * 64);
     float C[8][8];
     precomputeTransformation(C);
@@ -106,11 +172,16 @@ void forwardDCTMatrix(float block[8][8], float Dctfrequencies[8][8]) {
     MatrixMulSecTransp(temp, C, Dctfrequencies);
     // Dct = C * block * C^T 
     // temp = C * B => Dct = temp * C^T 
-
-
 }
 
 void inverseDCTMatrix(float Dctfrequencies[8][8], float block[8][8]) {
+    /*
+     * Aplica a Transformada Discreta de Cosseno Inversa (IDCT) em um bloco 8x8 usando multiplicação de matrizes.
+     *
+     * Parâmetros:
+     * Dctfrequencies: bloco 8x8 no domínio de frequência (entrada)
+     * block: bloco 8x8 no domínio espacial (saída)
+     */
     memset(block, 0, sizeof(float) * 64);	
     float C[8][8];
     precomputeTransformation(C);
@@ -118,7 +189,6 @@ void inverseDCTMatrix(float Dctfrequencies[8][8], float block[8][8]) {
 
     MatrixMulFirstTransp(C, Dctfrequencies, temp);
     MatrixMul(temp, C, block);
-
     // IDct = C^T * Dctf * C 
     // temp = C^T * Dctf => IDct = temp * C 
 
