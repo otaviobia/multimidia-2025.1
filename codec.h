@@ -30,14 +30,14 @@
     } PAR_RLE;
 
     typedef struct {
-        float coeficiente_dc;
+        int coeficiente_dc;
         PAR_RLE pares[64]; // Tamanho no pior caso
         int quantidade; // Quantidade real de pares
-    } BLOCO_RLE;
+    } BLOCO_RLE_DIFERENCIAL;
 
     typedef struct {
-        BLOCO_RLE Y_vetor[4], Cb_vetor, Cr_vetor;
-    } MACROBLOCO_RLE;
+        BLOCO_RLE_DIFERENCIAL Y_vetor[4], Cb_vetor, Cr_vetor;
+    } MACROBLOCO_RLE_DIFERENCIAL;
 
     MACROBLOCO* encodeImageYCbCr(PIXELYCBCR *image, int width, int height, int *out_macroblock_count);
     void decodeImageYCbCr(MACROBLOCO *mb_array, PIXELYCBCR *dst, int width, int height);
@@ -49,8 +49,10 @@
     void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality);
     void vectorize_macroblocks(MACROBLOCO *macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);
     void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO *macroblocks, int macroblock_count);
-    void rle_encode_macroblocks(MACROBLOCO_RLE *rle_macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);
-    void rle_decode_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO_RLE *rle_macroblocks, int macroblock_count);
+    void rle_encode_macroblocks(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);
+    void rle_decode_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
     void vectorize_block(float block[8][8], VETORZIGZAG *return_vector);
     void devectorize_block(VETORZIGZAG *vector, float block[8][8]);
+    void differential_encode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
+    void differential_decode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
 #endif

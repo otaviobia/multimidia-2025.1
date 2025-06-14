@@ -420,7 +420,7 @@ void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACR
     }
 }
 
-void rle_encode_block(BLOCO_RLE* rle_block, VETORZIGZAG* zigzag_block) {
+void rle_encode_block(BLOCO_RLE_DIFERENCIAL* rle_block, VETORZIGZAG* zigzag_block) {
     /*
      * Converte um bloco vetorizado em zigue-zague em um bloco codificado por carreira.
      */
@@ -428,7 +428,6 @@ void rle_encode_block(BLOCO_RLE* rle_block, VETORZIGZAG* zigzag_block) {
     int quantidade_zeros = 0;
 
     rle_block->coeficiente_dc = zigzag_block->vector[0];
-    printf("%f\n", rle_block->coeficiente_dc);
 
     for (int i = 1; i <= 63; i++) {
         if (fabs(zigzag_block->vector[i]) < 0.0001f) {
@@ -452,7 +451,7 @@ void rle_encode_block(BLOCO_RLE* rle_block, VETORZIGZAG* zigzag_block) {
     }
 }
 
-void rle_encode_macroblock(MACROBLOCO_RLE *rle_macroblock, MACROBLOCO_VETORIZADO *vectorized_macroblock) {
+void rle_encode_macroblock(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblock, MACROBLOCO_VETORIZADO *vectorized_macroblock) {
     /*
      * Converte um macrobloco vetorizado em zigue-zague em um macrobloco codificado por carreira.
      */
@@ -463,7 +462,7 @@ void rle_encode_macroblock(MACROBLOCO_RLE *rle_macroblock, MACROBLOCO_VETORIZADO
     rle_encode_block(&rle_macroblock->Cr_vetor, &vectorized_macroblock->Cr_vetor);
 }
 
-void rle_encode_macroblocks(MACROBLOCO_RLE *rle_macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count) {
+void rle_encode_macroblocks(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count) {
     /*
      * Converte um vetor de macroblocos vetorizados em zigue-zague em um vetor de macroblocos codificados por carreira.
      */
@@ -472,7 +471,7 @@ void rle_encode_macroblocks(MACROBLOCO_RLE *rle_macroblocks, MACROBLOCO_VETORIZA
     }
 }
 
-void rle_decode_block(VETORZIGZAG* zigzag_block, BLOCO_RLE* rle_block) {
+void rle_decode_block(VETORZIGZAG* zigzag_block, BLOCO_RLE_DIFERENCIAL* rle_block) {
     /*
      * Converte um bloco codificado por carreira em um bloco vetorizado em zigue-zague.
      */
@@ -506,7 +505,7 @@ void rle_decode_block(VETORZIGZAG* zigzag_block, BLOCO_RLE* rle_block) {
     }
 }
 
-void rle_decode_macroblock(MACROBLOCO_VETORIZADO *vectorized_macroblock, MACROBLOCO_RLE *rle_macroblock) {
+void rle_decode_macroblock(MACROBLOCO_VETORIZADO *vectorized_macroblock, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblock) {
     /*
      * Converte um macrobloco codificado por carreira em um macrobloco vetorizado em zigue-zague.
      */
@@ -517,11 +516,63 @@ void rle_decode_macroblock(MACROBLOCO_VETORIZADO *vectorized_macroblock, MACROBL
     rle_decode_block(&vectorized_macroblock->Cr_vetor, &rle_macroblock->Cr_vetor);
 }
 
-void rle_decode_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO_RLE *rle_macroblocks, int macroblock_count) {
+void rle_decode_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count) {
     /*
      * Converte um vetor de macroblocos codificados por carreira em um vetor de macroblocos vetorizados em zigue-zague.
      */
     for (int i = 0; i < macroblock_count; i++) {
         rle_decode_macroblock(&vectorized_macroblocks[i], &rle_macroblocks[i]);
+    }
+}
+
+void differential_encode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count) {
+    /*
+     * Faz codificação diferencial dos coeficientes DC dos macroblocos.
+     */
+    int previous_dc_Y[4] = {0}, previous_dc_Cb = 0, previous_dc_Cr = 0;
+
+    for (int i = 0; i < macroblock_count; i++) {
+        for (int j = 0; j < 4; j++) {
+            int current = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
+            int diff = current - previous_dc_Y[j];
+            rle_macroblocks[i].Y_vetor[j].coeficiente_dc = diff;
+            previous_dc_Y[j] = current;
+        }
+
+        int current_Cb = rle_macroblocks[i].Cb_vetor.coeficiente_dc;
+        int diff_Cb = current_Cb - previous_dc_Cb;
+        rle_macroblocks[i].Cb_vetor.coeficiente_dc = diff_Cb;
+        previous_dc_Cb = current_Cb;
+
+        int current_Cr = rle_macroblocks[i].Cr_vetor.coeficiente_dc;
+        int diff_Cr = current_Cr - previous_dc_Cr;
+        rle_macroblocks[i].Cr_vetor.coeficiente_dc = diff_Cr;
+        previous_dc_Cr = current_Cr;
+    }
+}
+
+void differential_decode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count) {
+    /*
+     * Faz decodificação diferencial dos coeficientes DC dos macroblocos.
+     */
+    int previous_dc_Y[4] = {0}, previous_dc_Cb = 0, previous_dc_Cr = 0;
+
+    for (int i = 0; i < macroblock_count; i++) {
+        for (int j = 0; j < 4; j++) {
+            int diff = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
+            int real_dc = previous_dc_Y[j] + diff;
+            rle_macroblocks[i].Y_vetor[j].coeficiente_dc = real_dc;
+            previous_dc_Y[j] = real_dc;
+        }
+
+        int diff_Cb = rle_macroblocks[i].Cb_vetor.coeficiente_dc;
+        int real_Cb = previous_dc_Cb + diff_Cb;
+        rle_macroblocks[i].Cb_vetor.coeficiente_dc = real_Cb;
+        previous_dc_Cb = real_Cb;
+
+        int diff_Cr = rle_macroblocks[i].Cr_vetor.coeficiente_dc;
+        int real_Cr = previous_dc_Cr + diff_Cr;
+        rle_macroblocks[i].Cr_vetor.coeficiente_dc = real_Cr;
+        previous_dc_Cr = real_Cr;
     }
 }

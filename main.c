@@ -9,7 +9,10 @@
 int main(void) {
     /* COMPRESSÃO */
 
+    float quality = 50; // Qualidade da quantização (50 é o padrão)
+
     // 1. Abre o arquivo BMP de entrada
+    FILE *input = fopen("images/256x256.bmp", "rb");
     if (!input) {
         printf("Error: could not open input file.\n");
         return 1;
@@ -57,14 +60,16 @@ int main(void) {
     MACROBLOCO_VETORIZADO* vectorized_macroblocks = (MACROBLOCO_VETORIZADO *) malloc(macroblock_count * sizeof(MACROBLOCO_VETORIZADO));
     vectorize_macroblocks(macroblocks, vectorized_macroblocks, macroblock_count);
 
-    // 9. Aplica codificação por carreira para os coeficientes AC
-    MACROBLOCO_RLE* rle_macroblocks = (MACROBLOCO_RLE *) malloc(macroblock_count * sizeof(MACROBLOCO_RLE));
-    rle_encode_macroblocks(rle_macroblocks, vectorized_macroblocks, macroblock_count);
+    // 9. Aplica codificação por carreira para os coeficientes AC e diferencial para os coeficientes DC
+    MACROBLOCO_RLE_DIFERENCIAL* rle_diff_macroblocks = (MACROBLOCO_RLE_DIFERENCIAL *) malloc(macroblock_count * sizeof(MACROBLOCO_RLE_DIFERENCIAL));
+    rle_encode_macroblocks(rle_diff_macroblocks, vectorized_macroblocks, macroblock_count);
+    differential_encode_dc(rle_diff_macroblocks, macroblock_count);
 
     /* DESCOMPRESSÃO */
-    // 1. Desaplica codificação por carreira
+    // 1. Desaplica codificação por diferencial e por carreira
     MACROBLOCO_VETORIZADO* new_vectorized_macroblocks = (MACROBLOCO_VETORIZADO *) malloc(macroblock_count * sizeof(MACROBLOCO_VETORIZADO));
-    rle_decode_macroblocks(new_vectorized_macroblocks, rle_macroblocks, macroblock_count);
+    differential_decode_dc(rle_diff_macroblocks, macroblock_count);
+    rle_decode_macroblocks(new_vectorized_macroblocks, rle_diff_macroblocks, macroblock_count);
 
     // 2. Desvetoriza os macroblocos
     MACROBLOCO *new_macroblocks = (MACROBLOCO *)malloc(macroblock_count * sizeof(MACROBLOCO));
@@ -97,7 +102,7 @@ int main(void) {
     free(DecodedYCbCr);
     free(macroblocks);
     free(vectorized_macroblocks);
-    free(rle_macroblocks);
+    free(rle_diff_macroblocks);
     free(new_vectorized_macroblocks);
     free(new_macroblocks);
 
