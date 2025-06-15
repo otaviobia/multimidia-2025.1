@@ -55,4 +55,7 @@
     void devectorize_block(VETORZIGZAG *vector, float block[8][8]);
     void differential_encode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
     void differential_decode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
+    int get_coefficient_category(int value);
+    int get_coefficient_code(int value, int category);
+    int decode_coefficient_from_category(int category, int code);
 #endif

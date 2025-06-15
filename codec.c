@@ -576,3 +576,105 @@ void differential_decode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
         previous_dc_Cr = real_Cr;
     }
 }
+
+int get_coefficient_category(int value) {
+    /*
+     * Determina a categoria de um coeficiente DC ou AC.
+     * Categoria 0: Valor 0
+     * Categoria 1: Valores -1, 1
+     * Categoria 2: Valores -3 a -2, 2 a 3
+     * Categoria 3: Valores -7 a -4, 4 a 7
+     * Categoria 4: Valores -15 a -8, 8 a 15
+     * Categoria 5: Valores -31 a -16, 16 a 31
+     * Categoria 6: Valores -63 a -32, 32 a 63
+     * Categoria 7: Valores -127 a -64, 64 a 127
+     * Categoria 8: Valores -255 a -128, 128 a 255
+     * Categoria 9: Valores -511 a -256, 256 a 511
+     * Categoria 10: Valores -1023 a -512, 512 a 1023
+     * Categoria 11: Valores -2047 a -1024, 1024 a 2047 (só para DC)
+     * 
+     * Parâmetros:
+     * value: Valor do coeficiente
+     *
+     * Retorna:
+     * Categoria do coeficiente (0 a 11)
+     */
+    if (value == 0) return 0;
+    
+    int abs_value = abs(value);
+    int category = 0;
+    int threshold = 1;
+    
+    while (abs_value >= threshold) { // Verifica se o valor absoluto é maior ou igual ao limite da categoria
+        category++;
+        threshold *= 2;
+    }
+    
+    return category;
+}
+
+int get_coefficient_code(int value, int category) {
+    /*
+     * Obtém o código dentro da categoria para um coeficiente.
+     * Para valores positivos, o código é o próprio valor.
+     * Para valores negativos, usa a representação complementar dentro da categoria.
+     *
+     * Parâmetros:
+     * value: Valor do coeficiente
+     * category: Categoria do coeficiente
+     *
+     * Retorna:
+     * Código do coeficiente dentro da categoria
+     */
+    if (value >= 0) {
+        return value;
+    } else {
+        // Para valores negativos, usa a representação complementar dentro da categoria.
+        // O código mapeia valores negativos para a primeira metade dos códigos da categoria.
+        // onde (1 << categoria) significa deslocar o bit 1 para a esquerda 'categoria' posições
+        // Categoria 1: valores -1, 1
+        // Para -1: -1 + (1 << 1) - 1 = -1 + 2 - 1 = 0
+        // Categoria 2: valores -3, -2, 2, 3
+        // Para -3: -3 + (1 << 2) - 1 = -3 + 4 - 1 = 0 ...
+        return value + (1 << category) - 1;
+    }
+}
+
+int decode_coefficient_from_category(int category, int code) {
+    /*
+     * Decodifica um coeficiente a partir de sua categoria e código.
+     * Esta função é o inverso de get_coefficient_code().
+     * 
+     * O processo de decodificação funciona assim:
+     * 1. Se categoria = 0, o valor é sempre 0
+     * 2. Para outras categorias, calculamos o threshold (limite) que separa 
+     *    valores positivos dos negativos dentro da categoria
+     * 3. Se o código >= threshold, é um valor positivo (código = valor)
+     * 4. Se o código < threshold, é um valor negativo (precisa ser convertido)
+     *
+     * Parâmetros:
+     * category: Categoria do coeficiente (0 a 11)
+     * code: Código do coeficiente dentro da categoria
+     *
+     * Retorna:
+     * Valor decodificado do coeficiente
+     */
+    if (category == 0) return 0;
+    
+    // Calcula o threshold (limite) que separa valores positivos dos negativos
+    // threshold = 2^(categoria-1)
+    // Exemplo: Para categoria 3, threshold = 2^(3-1) = 2^2 = 4
+    // Isso significa que códigos 0,1,2,3 são negativos e códigos 4,5,6,7 são positivos
+    int threshold = 1 << (category - 1);
+    if (code >= threshold) {
+        return code;
+    } else {
+        // Exemplos de decodificação:
+        // Categoria 1: threshold = 1, códigos 0,1
+        // - Código 0: 0 - 2 + 1 = -1
+        //
+        // Categoria 2: threshold = 2, códigos 0,1,2,3
+        // - Código 0: 0 - 4 + 1 = -3...
+        return code - (1 << category) + 1;
+    }
+}

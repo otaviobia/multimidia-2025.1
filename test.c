@@ -29,10 +29,10 @@ void compareRGB(const PIXELRGB *orig, const PIXELRGB *recon, int tam) {
         }
     }
     if (cont == 0){
-        printf("*************** Rgb Comparison Info ***************\n");
+        printf("\n*************** Rgb Comparison Info ***************\n");
         printf("No differences found.\n");
     } else {
-        printf("*************** Rgb Comparison Info ***************\n");
+        printf("\n*************** Rgb Comparison Info ***************\n");
         printf("Differences found: %d\n", cont);
         printf("Biggest differences is R: %d G: %d B: %d \n", biggestR, biggestG, biggestB);
     }
@@ -51,7 +51,7 @@ void compareBlock(const float Block[8][8], const float RecBlock[8][8]) {
     float maxDiff = 0.0f; 
     float diff = 0.01f; 
 
-    printf("*************** Block Comparison Info ***************\n");
+    printf("\n*************** Block Comparison Info ***************\n");
 
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
@@ -87,7 +87,7 @@ void DCTBenchComparison(const float Dctfrequencies0[8][8], const float Dctfreque
     float maxDiffRec = 0.0f; // Max diff in idct
     float diff = 0.01f; // Diff analyzed
 
-    printf("*************** DCT Comparison Info ***************\n");
+    printf("\n*************** DCT Comparison Info ***************\n");
 
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
@@ -138,7 +138,7 @@ int compareYBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_x, 
     int diff = 2;
     int biggestDiff = 0;
     
-    //printf("*************** Y Block Comparison Info ***************\n");
+    //printf("\n*************** Y Block Comparison Info ***************\n");
 
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
@@ -181,7 +181,7 @@ int compareCbCrBlock(const PIXELYCBCR *orig, const PIXELYCBCR *recon, int start_
     int diff = 2;
     int biggestCb = 0, biggestCr = 0;
     
-    //printf("*************** CbCr Block Comparison Info ***************\n");
+    //printf("\n*************** CbCr Block Comparison Info ***************\n");
 
     for (int y = 0; y < 16; y++) {
         for (int x = 0; x < 16; x++) {
@@ -346,7 +346,7 @@ void testImageWithoutDCT(PIXELYCBCR *image, int width, int height, BITMAPFILEHEA
      * FileHeader: cabeçalho de arquivo BMP
      * InfoHeader: cabeçalho de informação BMP
      */
-    printf("*************** Teste Sem DCT ***************\n");
+    printf("\n*************** Teste Sem DCT ***************\n");
     
     // Cria imagem temporária para a reconstrução
     PIXELYCBCR *recon = (PIXELYCBCR *)malloc(width * height * sizeof(PIXELYCBCR));
@@ -409,7 +409,7 @@ void testVectorization() {
      * Cria uma matriz de teste com valores 0-63 em ordem linear, vetoriza usando o padrão
      * zigue-zague, e depois desvetoriza para verificar a corretude da implementação.
      */
-    printf("*************** Vectorization Test ***************\n");
+    printf("\n*************** Vectorization Test ***************\n");
     
     // Create a test matrix with values 0-63
     float test_block[8][8];
@@ -472,4 +472,296 @@ void testVectorization() {
     }
     
     printf("************************************************\n\n");
+}
+
+void testDCCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count) {
+    /*
+     * Testa como os coeficientes DC seriam codificados usando categorias JPEG.
+     * Esta função não altera os dados, apenas mostra como seria feita a codificação.
+     * Útil para debugging e validação do sistema de categorias.
+     *
+     * Parâmetros:
+     * rle_macroblocks: Vetor de macroblocos com codificação RLE
+     * macroblock_count: Quantidade de macroblocos
+     */
+    printf("\n*************** Teste de Codificacao DC por Categoria ***************\n");
+    
+    int total_dc_coeffs = 0;
+    int category_count[12] = {0}; // Contador para cada categoria (0-11)
+    
+    for (int i = 0; i < macroblock_count && i < 3; i++) { // Testa apenas os primeiros 3 macroblocos
+        printf("Macrobloco %d:\n", i);
+        
+        // Testa coeficientes DC dos blocos Y
+        for (int j = 0; j < 4; j++) {
+            int dc_value = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
+            int category = get_coefficient_category(dc_value);
+            int code = get_coefficient_code(dc_value, category);
+            int decoded = decode_coefficient_from_category(category, code);
+            
+            printf("  Y[%d] DC: valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+                   j, dc_value, category, code, decoded, 
+                   (dc_value == decoded) ? "Y" : "X");
+            
+            category_count[category]++;
+            total_dc_coeffs++;
+        }
+        
+        // Testa coeficiente DC do bloco Cb
+        int dc_cb = rle_macroblocks[i].Cb_vetor.coeficiente_dc;
+        int cat_cb = get_coefficient_category(dc_cb);
+        int code_cb = get_coefficient_code(dc_cb, cat_cb);
+        int decoded_cb = decode_coefficient_from_category(cat_cb, code_cb);
+        
+        printf("  Cb DC: valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+               dc_cb, cat_cb, code_cb, decoded_cb,
+               (dc_cb == decoded_cb) ? "Y" : "X");
+        
+        category_count[cat_cb]++;
+        total_dc_coeffs++;
+        
+        // Testa coeficiente DC do bloco Cr
+        int dc_cr = rle_macroblocks[i].Cr_vetor.coeficiente_dc;
+        int cat_cr = get_coefficient_category(dc_cr);
+        int code_cr = get_coefficient_code(dc_cr, cat_cr);
+        int decoded_cr = decode_coefficient_from_category(cat_cr, code_cr);
+        
+        printf("  Cr DC: valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+               dc_cr, cat_cr, code_cr, decoded_cr,
+               (dc_cr == decoded_cr) ? "Y" : "X");
+        
+        category_count[cat_cr]++;
+        total_dc_coeffs++;
+        printf("\n");
+    }
+    
+    // Estatísticas das categorias
+    // printf("Estatisticas das Categorias DC:\n");
+    // for (int i = 0; i < 12; i++) {
+    //     if (category_count[i] > 0) {
+    //         printf("  Categoria %d: %d coeficientes (%.1f%%)\n", 
+    //                i, category_count[i], 
+    //                (float)category_count[i] * 100.0f / total_dc_coeffs);
+    //     }
+    // }
+    printf("Total de coeficientes DC analisados: %d\n", total_dc_coeffs);
+    printf("************************************************************\n\n");
+}
+
+void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count) {
+    /*
+     * Testa como os coeficientes AC seriam codificados usando categorias JPEG.
+     * Esta funcao nao altera os dados, apenas mostra como seria feita a codificacao.
+     * Util para debugging e validacao do sistema de categorias para coeficientes AC.
+     *
+     * Parametros:
+     * rle_macroblocks: Vetor de macroblocos com codificacao RLE
+     * macroblock_count: Quantidade de macroblocos
+     */
+    printf("\n*************** Teste de Codificacao AC por Categoria ***************\n");
+    
+    int total_ac_coeffs = 0;
+    int category_count[12] = {0}; // Contador para cada categoria (0-11)
+    int zero_runs[17] = {0}; // Contador para runs de zeros (0-16, onde 16 e ZRL)
+    
+    for (int i = 0; i < macroblock_count && i < 2; i++) { // Testa apenas os primeiros 2 macroblocos
+        printf("Macrobloco %d:\n", i);
+        
+        // Testa o primeiro bloco Y de cada macrobloco
+        BLOCO_RLE_DIFERENCIAL *block_y = &rle_macroblocks[i].Y_vetor[0];
+        printf("  Componente Y[0] (%d coeficientes AC):\n", block_y->quantidade);
+        
+        for (int k = 0; k < block_y->quantidade && k < 5; k++) { // Mostra apenas os primeiros 5
+            PAR_RLE *par = &block_y->pares[k];
+            int ac_value = (int)round(par->valor);
+            
+            // Verifica se e EOB
+            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+                printf("    AC[%d]: EOB (End of Block)\n", k);
+                break;
+            }
+            
+            int category = get_coefficient_category(ac_value);
+            int code = get_coefficient_code(ac_value, category);
+            int decoded = decode_coefficient_from_category(category, code);
+            
+            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+                   k, par->zeros, par->valor, category, code, decoded,
+                   (ac_value == decoded) ? "Y" : "X");
+            
+            // Estatisticas
+            if (ac_value != 0) {
+                category_count[category]++;
+                total_ac_coeffs++;
+            }
+            
+            if (par->zeros <= 16) {
+                zero_runs[par->zeros]++;
+            }
+        }
+        
+        // TESTA COMPONENTE Cb
+        BLOCO_RLE_DIFERENCIAL *block_cb = &rle_macroblocks[i].Cb_vetor;
+        printf("  Componente Cb (%d coeficientes AC):\n", block_cb->quantidade);
+        
+        for (int k = 0; k < block_cb->quantidade && k < 5; k++) { // Mostra apenas os primeiros 5
+            PAR_RLE *par = &block_cb->pares[k];
+            int ac_value = (int)round(par->valor);
+            
+            // Verifica se e EOB
+            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+                printf("    AC[%d]: EOB (End of Block)\n", k);
+                break;
+            }
+            
+            int category = get_coefficient_category(ac_value);
+            int code = get_coefficient_code(ac_value, category);
+            int decoded = decode_coefficient_from_category(category, code);
+            
+            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+                   k, par->zeros, par->valor, category, code, decoded,
+                   (ac_value == decoded) ? "Y" : "X");
+            
+            // Estatisticas
+            if (ac_value != 0) {
+                category_count[category]++;
+                total_ac_coeffs++;
+            }
+            
+            if (par->zeros <= 16) {
+                zero_runs[par->zeros]++;
+            }
+        }
+        
+        // TESTA COMPONENTE Cr
+        BLOCO_RLE_DIFERENCIAL *block_cr = &rle_macroblocks[i].Cr_vetor;
+        printf("  Componente Cr (%d coeficientes AC):\n", block_cr->quantidade);
+        
+        for (int k = 0; k < block_cr->quantidade && k < 5; k++) { // Mostra apenas os primeiros 5
+            PAR_RLE *par = &block_cr->pares[k];
+            int ac_value = (int)round(par->valor);
+            
+            // Verifica se e EOB
+            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+                printf("    AC[%d]: EOB (End of Block)\n", k);
+                break;
+            }
+            
+            int category = get_coefficient_category(ac_value);
+            int code = get_coefficient_code(ac_value, category);
+            int decoded = decode_coefficient_from_category(category, code);
+            
+            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+                   k, par->zeros, par->valor, category, code, decoded,
+                   (ac_value == decoded) ? "Y" : "X");
+            
+            // Estatisticas
+            if (ac_value != 0) {
+                category_count[category]++;
+                total_ac_coeffs++;
+            }
+            
+            if (par->zeros <= 16) {
+                zero_runs[par->zeros]++;
+            }
+        }
+        
+        printf("\n");
+    }
+    
+    printf("Total de coeficientes AC nao-zero analisados: %d\n", total_ac_coeffs);
+    printf("************************************************************\n\n");
+}
+
+void testCategoryEncodingRoundtrip(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count) {
+    /*
+     * Testa a codificacao e decodificacao por categorias para verificar se sao reverseis.
+     * Esta funcao verifica se get_coefficient_code() e decode_coefficient_from_category()
+     * sao funcoes inversas uma da outra.
+     *
+     * Parametros:
+     * rle_macroblocks: Vetor de macroblocos com codificacao RLE
+     * macroblock_count: Quantidade de macroblocos
+     */
+    printf("\n*************** Teste de Codificacao por Categoria ***************\n");
+    
+    int total_tests = 0;
+    int failed_tests = 0;
+    
+    for (int i = 0; i < macroblock_count && i < 5; i++) {
+        // Testa coeficientes DC
+        for (int j = 0; j < 4; j++) {
+            int original = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
+            int category = get_coefficient_category(original);
+            int code = get_coefficient_code(original, category);
+            int decoded = decode_coefficient_from_category(category, code);
+            
+            total_tests++;
+            if (original != decoded) {
+                printf("ERRO DC Y[%d] do MB[%d]: %d -> cat=%d, code=%d -> %d\n", 
+                       j, i, original, category, code, decoded);
+                failed_tests++;
+            }
+        }
+        
+        // Testa DC Cb
+        int original_cb = rle_macroblocks[i].Cb_vetor.coeficiente_dc;
+        int cat_cb = get_coefficient_category(original_cb);
+        int code_cb = get_coefficient_code(original_cb, cat_cb);
+        int decoded_cb = decode_coefficient_from_category(cat_cb, code_cb);
+        
+        total_tests++;
+        if (original_cb != decoded_cb) {
+            printf("ERRO DC Cb do MB[%d]: %d -> cat=%d, code=%d -> %d\n", 
+                   i, original_cb, cat_cb, code_cb, decoded_cb);
+            failed_tests++;
+        }
+        
+        // Testa DC Cr
+        int original_cr = rle_macroblocks[i].Cr_vetor.coeficiente_dc;
+        int cat_cr = get_coefficient_category(original_cr);
+        int code_cr = get_coefficient_code(original_cr, cat_cr);
+        int decoded_cr = decode_coefficient_from_category(cat_cr, code_cr);
+        
+        total_tests++;
+        if (original_cr != decoded_cr) {
+            printf("ERRO DC Cr do MB[%d]: %d -> cat=%d, code=%d -> %d\n", 
+                   i, original_cr, cat_cr, code_cr, decoded_cr);
+            failed_tests++;
+        }
+        
+        // Testa alguns coeficientes AC
+        for (int j = 0; j < 4; j++) {
+            BLOCO_RLE_DIFERENCIAL *block = &rle_macroblocks[i].Y_vetor[j];
+            for (int k = 0; k < block->quantidade && k < 5; k++) {
+                int original_ac = (int)round(block->pares[k].valor);
+                if (original_ac == 0) continue; // Pula zeros (EOB)
+                
+                int cat_ac = get_coefficient_category(original_ac);
+                int code_ac = get_coefficient_code(original_ac, cat_ac);
+                int decoded_ac = decode_coefficient_from_category(cat_ac, code_ac);
+                
+                total_tests++;
+                if (original_ac != decoded_ac) {
+                    printf("ERRO AC Y[%d][%d] do MB[%d]: %d -> cat=%d, code=%d -> %d\n", 
+                           j, k, i, original_ac, cat_ac, code_ac, decoded_ac);
+                    failed_tests++;
+                }
+            }
+        }
+    }
+    
+    printf("Resultado do Teste de Roundtrip:\n");
+    printf("  Total de testes: %d\n", total_tests);
+    printf("  Testes falharam: %d\n", failed_tests);
+    printf("  Taxa de sucesso: %.2f%%\n", 
+           total_tests > 0 ? (float)(total_tests - failed_tests) * 100.0f / total_tests : 0.0f);
+    
+    if (failed_tests == 0) {
+        printf("  SUCESSO: Todas as codificacoes/decodificacoes sao reverseis!\n");
+    } else {
+        printf("  FALHA: Encontrados erros na codificacao/decodificacao!\n");
+    }
+    
+    printf("************************************************************\n\n");
 }

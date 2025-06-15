@@ -16,6 +16,8 @@
     void saveChannelImages(PIXELYCBCR *pixels, int width, int height, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader);
     void testImageWithoutDCT(PIXELYCBCR *image, int width, int height, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader);
     void testVectorization();
-
+    void testDCCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
+    void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
+    void testCategoryEncodingRoundtrip(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
 
 #endif
