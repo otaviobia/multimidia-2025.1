@@ -765,3 +765,362 @@ void testCategoryEncodingRoundtrip(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, 
     
     printf("************************************************************\n\n");
 }
+
+void printBitsInBuffer(BitBuffer* buffer) {
+    /*
+     * Imprime o conteúdo do buffer em formato binário para debugging
+     * 
+     * Parâmetros:
+     * buffer: o buffer de bits a ser impresso
+     */
+    printf("Buffer conteudo (binario): ");
+    for (size_t i = 0; i < buffer->byte_position + 1; i++) {
+        for (int bit = 7; bit >= 0; bit--) {
+            printf("%d", (buffer->data[i] & (1 << bit)) ? 1 : 0);
+        }
+        printf(" ");
+    }
+    printf("\n");
+    printf("Posicao atual: byte %zu, bit %d\n", buffer->byte_position, buffer->bit_position);
+}
+
+void testBitBufferSimple() {
+    /*
+     * Teste básico de ida e volta das funções write_bits e read_bits
+     * Verifica se padrões de bits escritos podem ser lidos corretamente
+     */
+    printf("\n*************** Teste BitBuffer Basico ***************\n");
+    
+    // Cria um buffer de bits com capacidade inicial
+    BitBuffer* buffer = init_bit_buffer(16);
+    if (!buffer) {
+        printf("Falha ao criar buffer!\n");
+        return;
+    }
+    
+    // Padrões de teste - pares (valor, número de bits)
+    struct TestPattern {
+        int value;
+        int bits;
+    } patterns[] = {
+        {5, 3},      // 101 (3 bits)
+        {10, 4},     // 1010 (4 bits)
+        {15, 4},     // 1111 (4 bits)
+        {0, 3},      // 000 (3 bits)
+        {255, 8}     // 11111111 (8 bits)
+    };
+    
+    int num_patterns = sizeof(patterns) / sizeof(patterns[0]);
+    printf("Escrevendo %d padroes no buffer...\n", num_patterns);
+    
+    // Escreve os padrões no buffer
+    for (int i = 0; i < num_patterns; i++) {
+        if (!write_bits(buffer, patterns[i].value, patterns[i].bits)) {
+            printf("ERRO: Falha ao escrever padrao %d!\n", i);
+            free_bit_buffer(buffer);
+            return;
+        }
+        printf("Escrito: valor=%d, bits=%d\n", patterns[i].value, patterns[i].bits);
+    }
+    
+    // Mostra o conteúdo do buffer para debugging
+    printBitsInBuffer(buffer);
+    
+    // Reseta a posição do buffer para leitura
+    buffer->byte_position = 0;
+    buffer->bit_position = 0;
+    
+    // Lê os padrões do buffer
+    printf("\nLendo padroes do buffer...\n");
+    for (int i = 0; i < num_patterns; i++) {
+        int read_value = read_bits(buffer, patterns[i].bits);
+        printf("Esperado: %d, Lido: %d - %s\n", 
+               patterns[i].value, read_value, 
+               (patterns[i].value == read_value) ? "OK" : "ERRO");
+        
+        if (patterns[i].value != read_value) {
+            printf("ERRO: Falha na leitura do padrao %d!\n", i);
+        }
+    }
+    
+    free_bit_buffer(buffer);
+    printf("********************************************\n\n");
+}
+
+void testBitBufferExtensive() {
+    /*
+     * Teste extensivo de ida e volta das funções write_bits e read_bits
+     * Testa vários padrões e limites do buffer
+     */
+    printf("\n*************** Teste BitBuffer Extensivo ***************\n");
+    
+    BitBuffer* buffer = init_bit_buffer(8);  // Começa com um buffer pequeno
+    if (!buffer) {
+        printf("Falha ao criar buffer!\n");
+        return;
+    }
+    
+    int errors = 0;
+    int total_tests = 0;
+    
+    // Teste 1: Escrever e ler bits individuais
+    printf("Teste 1: Bits individuais\n");
+    int bit_pattern[] = {1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0};
+    int num_bits = sizeof(bit_pattern) / sizeof(bit_pattern[0]);
+    
+    // Escreve bits individuais
+    for (int i = 0; i < num_bits; i++) {
+        if (!write_bits(buffer, bit_pattern[i], 1)) {
+            printf("ERRO: Falha ao escrever bit individual %d!\n", i);
+            errors++;
+        }
+        total_tests++;
+    }
+    
+    // Reseta o buffer para leitura
+    buffer->byte_position = 0;
+    buffer->bit_position = 0;
+    
+    // Lê bits individuais
+    for (int i = 0; i < num_bits; i++) {
+        int bit = read_bits(buffer, 1);
+        if (bit != bit_pattern[i]) {
+            printf("ERRO: Bit individual %d nao corresponde! Esperado: %d, Lido: %d\n", 
+                   i, bit_pattern[i], bit);
+            errors++;
+        }
+        total_tests++;
+    }
+    
+    // Reseta o buffer
+    free_bit_buffer(buffer);
+    buffer = init_bit_buffer(8);
+    
+    // Teste 2: Escrever e ler valores com diferentes tamanhos
+    printf("\nTeste 2: Valores com diferentes tamanhos\n");
+    struct TestCase {
+        int value;
+        int bits;
+    } test_cases[] = {
+        {0, 1},       // 0 (1 bit)
+        {1, 1},       // 1 (1 bit)
+        {3, 2},       // 11 (2 bits)
+        {7, 3},       // 111 (3 bits)
+        {12, 4},      // 1100 (4 bits)
+        {21, 5},      // 10101 (5 bits)
+        {42, 6},      // 101010 (6 bits)
+        {85, 7},      // 1010101 (7 bits)
+        {170, 8},     // 10101010 (8 bits)
+        {511, 9},     // 111111111 (9 bits)
+        {1023, 10}    // 1111111111 (10 bits)
+    };
+    
+    int num_cases = sizeof(test_cases) / sizeof(test_cases[0]);
+    
+    // Escreve os valores
+    for (int i = 0; i < num_cases; i++) {
+        if (!write_bits(buffer, test_cases[i].value, test_cases[i].bits)) {
+            printf("ERRO: Falha ao escrever caso %d!\n", i);
+            errors++;
+        }
+        total_tests++;
+    }
+    
+    // Mostra o conteúdo do buffer para debugging
+    printBitsInBuffer(buffer);
+    
+    // Reseta para leitura
+    buffer->byte_position = 0;
+    buffer->bit_position = 0;
+    
+    // Lê os valores
+    for (int i = 0; i < num_cases; i++) {
+        int read_value = read_bits(buffer, test_cases[i].bits);
+        if (read_value != test_cases[i].value) {
+            printf("ERRO: Caso %d nao corresponde! Esperado: %d, Lido: %d\n", 
+                   i, test_cases[i].value, read_value);
+            errors++;
+        }
+        total_tests++;
+    }
+    
+    // Teste 3: Escrever e ler valores que forçam o buffer a crescer
+    printf("\nTeste 3: Forcar o crescimento do buffer\n");
+    free_bit_buffer(buffer);
+    buffer = init_bit_buffer(1);  // Começa com apenas 1 byte
+    
+    // Escreve uma sequência que ocupa vários bytes
+    int big_value = 0xFFFFFF;  // 24 bits ligados
+    if (!write_bits(buffer, big_value, 24)) {
+        printf("ERRO: Falha ao escrever valor grande!\n");
+        errors++;
+    }
+    total_tests++;
+    
+    // Verifica a capacidade do buffer após o crescimento
+    printf("Capacidade do buffer apos crescimento: %zu bytes\n", buffer->capacity);
+    
+    // Reseta para leitura
+    buffer->byte_position = 0;
+    buffer->bit_position = 0;
+    
+    // Lê o valor grande
+    int read_big_value = read_bits(buffer, 24);
+    if (read_big_value != big_value) {
+        printf("ERRO: Valor grande nao corresponde! Esperado: %d, Lido: %d\n", 
+               big_value, read_big_value);
+        errors++;
+    }
+    total_tests++;
+    
+    // Resultado final
+    printf("\nResultado do teste BitBuffer:\n");
+    printf("Total de testes: %d\n", total_tests);
+    printf("Erros encontrados: %d\n", errors);
+    
+    if (errors == 0) {
+        printf("SUCESSO: Todos os testes passaram!\n");
+    } else {
+        printf("FALHA: %d testes falharam!\n", errors);
+    }
+    
+    free_bit_buffer(buffer);
+    printf("********************************************\n\n");
+}
+
+void testHuffmanRoundtrip() {
+    /*
+     * Testa o processo completo de codificação e decodificação Huffman
+     * Codifica e decodifica alguns valores de teste e verifica se são iguais
+     */
+    printf("\n*************** Teste Huffman ida e volta ***************\n");
+    
+    // Cria um buffer para o teste
+    BitBuffer* buffer = init_bit_buffer(64);
+    if (!buffer) {
+        printf("Falha ao criar buffer!\n");
+        return;
+    }
+    
+    // 1. Teste de coeficientes DC
+    int dc_values[] = {0, 1, -1, 15, -15, 128, -128, 255, -255, 1023, -1023};
+    int num_dc_values = sizeof(dc_values) / sizeof(dc_values[0]);
+    int errors_dc = 0;
+    
+    printf("Testando coeficientes DC...\n");
+    
+    for (int i = 0; i < num_dc_values; i++) {
+        // Reset do buffer para cada teste
+        buffer->byte_position = 0;
+        buffer->bit_position = 0;
+        memset(buffer->data, 0, buffer->capacity);
+        
+        // Codifica o valor DC
+        if (!write_dc_coefficient(buffer, dc_values[i])) {
+            printf("ERRO: Falha ao codificar DC %d!\n", dc_values[i]);
+            errors_dc++;
+            continue;
+        }
+        
+        // Reinicia posição para leitura
+        buffer->byte_position = 0;
+        buffer->bit_position = 0;
+        
+        // Decodifica o valor DC
+        int decoded_dc = decode_dc_coefficient(buffer);
+        
+        // Verifica se o valor decodificado é igual ao original
+        if (decoded_dc != dc_values[i]) {
+            printf("ERRO DC: Original=%d, Decodificado=%d\n", dc_values[i], decoded_dc);
+            errors_dc++;
+        }
+    }
+    
+    // 2. Teste de coeficientes AC
+    struct ACTestCase {
+        int run;
+        int value;
+    } ac_cases[] = {
+        {0, 0},      // EOB
+        {0, 1},      // (0,1)
+        {0, -1},     // (0,-1)
+        {1, 2},      // (1,2)
+        {2, -2},     // (2,-2)
+        {0, 7},      // (0,7)
+        {3, -7},     // (3,-7)
+        {15, 0},     // ZRL
+        {10, 5},     // (10,5)
+        {14, -10}    // (14,-10)
+    };
+    int num_ac_cases = sizeof(ac_cases) / sizeof(ac_cases[0]);
+    int errors_ac = 0;
+    
+    printf("\nTestando coeficientes AC...\n");
+    
+    for (int i = 0; i < num_ac_cases; i++) {
+        // Reset do buffer para cada teste
+        buffer->byte_position = 0;
+        buffer->bit_position = 0;
+        memset(buffer->data, 0, buffer->capacity);
+        
+        // Codifica o par AC
+        if (!write_ac_coefficient(buffer, ac_cases[i].run, ac_cases[i].value)) {
+            printf("ERRO: Falha ao codificar AC (%d,%d)!\n", 
+                   ac_cases[i].run, ac_cases[i].value);
+            errors_ac++;
+            continue;
+        }
+        
+        // Reinicia posição para leitura
+        buffer->byte_position = 0;
+        buffer->bit_position = 0;
+        
+        // Decodifica o par AC
+        int run_length, value;
+        int result = decode_ac_coefficient(buffer, &run_length, &value);
+        
+        // Verifica se a decodificação foi bem-sucedida
+        if (result <= 0) {
+            printf("ERRO: Falha ao decodificar AC (%d,%d)!\n", 
+                   ac_cases[i].run, ac_cases[i].value);
+            errors_ac++;
+            continue;
+        }
+        
+        // Verifica casos especiais: EOB e ZRL
+        if (ac_cases[i].run == 0 && ac_cases[i].value == 0) {
+            // Deve ser EOB (result = 2)
+            if (result != 2) {
+                printf("ERRO AC EOB: Nao reconhecido como EOB!\n");
+                errors_ac++;
+            }
+        } else if (ac_cases[i].run == 15 && ac_cases[i].value == 0) {
+            // Deve ser ZRL (result = 3)
+            if (result != 3) {
+                printf("ERRO AC ZRL: Não reconhecido como ZRL!\n");
+                errors_ac++;
+            }
+        } else {
+            // Caso normal, verifique run e value
+            if (run_length != ac_cases[i].run || value != ac_cases[i].value) {
+                printf("ERRO AC: Original=(%d,%d), Decodificado=(%d,%d)\n", 
+                       ac_cases[i].run, ac_cases[i].value, run_length, value);
+                errors_ac++;
+            }
+        }
+    }
+    
+    // Resultados finais
+    printf("\nResultado do teste Huffman Roundtrip:\n");
+    printf("Testes DC: %d erros de %d testes\n", errors_dc, num_dc_values);
+    printf("Testes AC: %d erros de %d testes\n", errors_ac, num_ac_cases);
+    
+    if (errors_dc == 0 && errors_ac == 0) {
+        printf("SUCESSO: Todos os testes Huffman passaram!\n");
+    } else {
+        printf("FALHA: Encontrados erros nos testes Huffman!\n");
+    }
+    
+    free_bit_buffer(buffer);
+    printf("********************************************\n\n");
+}

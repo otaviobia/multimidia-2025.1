@@ -641,40 +641,14 @@ int get_coefficient_code(int value, int category) {
 }
 
 int decode_coefficient_from_category(int category, int code) {
-    /*
-     * Decodifica um coeficiente a partir de sua categoria e código.
-     * Esta função é o inverso de get_coefficient_code().
-     * 
-     * O processo de decodificação funciona assim:
-     * 1. Se categoria = 0, o valor é sempre 0
-     * 2. Para outras categorias, calculamos o threshold (limite) que separa 
-     *    valores positivos dos negativos dentro da categoria
-     * 3. Se o código >= threshold, é um valor positivo (código = valor)
-     * 4. Se o código < threshold, é um valor negativo (precisa ser convertido)
-     *
-     * Parâmetros:
-     * category: Categoria do coeficiente (0 a 11)
-     * code: Código do coeficiente dentro da categoria
-     *
-     * Retorna:
-     * Valor decodificado do coeficiente
-     */
     if (category == 0) return 0;
     
-    // Calcula o threshold (limite) que separa valores positivos dos negativos
-    // threshold = 2^(categoria-1)
-    // Exemplo: Para categoria 3, threshold = 2^(3-1) = 2^2 = 4
-    // Isso significa que códigos 0,1,2,3 são negativos e códigos 4,5,6,7 são positivos
-    int threshold = 1 << (category - 1);
-    if (code >= threshold) {
-        return code;
+    // Verifica se o primeiro bit está ligado (valor positivo)
+    if ((code >> (category - 1)) & 1) {
+        return code; // Valor positivo, mantém como está
     } else {
-        // Exemplos de decodificação:
-        // Categoria 1: threshold = 1, códigos 0,1
-        // - Código 0: 0 - 2 + 1 = -1
-        //
-        // Categoria 2: threshold = 2, códigos 0,1,2,3
-        // - Código 0: 0 - 4 + 1 = -3...
-        return code - (1 << category) + 1;
+        // Valor negativo
+        // O código é o complemento de 2^category - 1 - code
+        return -((1 << category) - 1 - code);
     }
 }

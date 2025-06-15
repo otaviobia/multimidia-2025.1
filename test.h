@@ -4,6 +4,7 @@
     #include "bitmap.h"
     #include "codec.h"
     #include "dct.h"
+    #include "huffman.h"
     #include <stdlib.h>
     #include <string.h>
 
@@ -19,5 +20,9 @@
     void testDCCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
     void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
     void testCategoryEncodingRoundtrip(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count);
+    void printBitsInBuffer(BitBuffer* buffer);
+    void testBitBufferSimple();
+    void testBitBufferExtensive();
+    void testHuffmanRoundtrip();
 
 #endif

@@ -74,6 +74,10 @@ int main(void) {
     // Teste 3: Teste de roundtrip (codifica e decodifica para verificar reversibilidade)
     testCategoryEncodingRoundtrip(rle_diff_macroblocks, macroblock_count);
 
+    testBitBufferSimple();
+    testBitBufferExtensive();
+    testHuffmanRoundtrip();
+
     /* DESCOMPRESSÃO */
     // 1. Desaplica codificação por diferencial e por carreira
     MACROBLOCO_VETORIZADO* new_vectorized_macroblocks = (MACROBLOCO_VETORIZADO *) malloc(macroblock_count * sizeof(MACROBLOCO_VETORIZADO));

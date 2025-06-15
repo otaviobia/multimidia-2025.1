@@ -3,6 +3,7 @@
 
     #include <stdio.h>
     #include <stdint.h>
+    #include "codec.h"
 
     // Tamanho máximo do código Huffman no padrão JPEG (16 bits)
     #define MAX_HUFFMAN_CODE_LENGTH 16
@@ -29,7 +30,26 @@
         int bit_position;            // Posição atual em bits (0-7)
     } BitBuffer;
 
-    // ===================== TABELAS HUFFMAN FIXAS JPEG =====================
+    // Funções de manipulação de buffer
+    BitBuffer* init_bit_buffer(size_t initial_capacity);
+    void free_bit_buffer(BitBuffer* buffer);
+    int write_bits(BitBuffer* buffer, int value, int num_bits);
+    int read_bits(BitBuffer* buffer, int num_bits);
+    size_t get_huffman_buffer_size(BitBuffer* buffer);
+
+    // Funções de codificação Huffman
+    int write_dc_coefficient(BitBuffer* buffer, int dc_diff);
+    int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value);
+    int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block);
+    BitBuffer* huffman_encode_macroblock(MACROBLOCO_RLE_DIFERENCIAL* macroblock);
+
+    // Funções de decodificação Huffman
+    int decode_dc_huffman(BitBuffer* buffer);
+    int decode_dc_coefficient(BitBuffer* buffer);
+    int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category);
+    int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value);
+    int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block);
+    MACROBLOCO_RLE_DIFERENCIAL* huffman_decode_macroblock(BitBuffer* buffer);
 
     // Tabela DC - Fornecida
     static const HuffmanEntry JPEG_DC_LUMINANCE_TABLE[11] = {
