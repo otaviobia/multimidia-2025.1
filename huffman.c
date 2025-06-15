@@ -148,6 +148,12 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
         return write_bits(buffer, entry->code_value, entry->code_length);
     }
     
+    // ZRL - Zero Run Length (15,0)
+    if (run_length == 15 && ac_value == 0) {
+        const HuffmanEntry* zrl = &JPEG_AC_LUMINANCE_MATRIX[15][0];
+        return write_bits(buffer, zrl->code_value, zrl->code_length);
+    }
+    
     // Trata sequências longas de zeros (>15) usando ZRL
     while (run_length > 15) {
         // ZRL - Zero Run Length (15,0)

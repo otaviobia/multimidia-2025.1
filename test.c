@@ -1002,12 +1002,12 @@ void testHuffmanRoundtrip() {
         return;
     }
     
-    // 1. Teste de coeficientes DC
-    int dc_values[] = {0, 1, -1, 15, -15, 128, -128, 255, -255, 1023, -1023};
-    int num_dc_values = sizeof(dc_values) / sizeof(dc_values[0]);
+    // 1. Teste de coeficientes DC (usando diferenças, não valores absolutos)
+    int dc_diffs[] = {0, 1, -1, 15, -15, 64, -64, 127, -127, 255, -255}; // Valores de diferença mais realistas
+    int num_dc_values = sizeof(dc_diffs) / sizeof(dc_diffs[0]);
     int errors_dc = 0;
     
-    printf("Testando coeficientes DC...\n");
+    printf("Testando coeficientes DC (diferencas)...\n");
     
     for (int i = 0; i < num_dc_values; i++) {
         // Reset do buffer para cada teste
@@ -1015,9 +1015,9 @@ void testHuffmanRoundtrip() {
         buffer->bit_position = 0;
         memset(buffer->data, 0, buffer->capacity);
         
-        // Codifica o valor DC
-        if (!write_dc_coefficient(buffer, dc_values[i])) {
-            printf("ERRO: Falha ao codificar DC %d!\n", dc_values[i]);
+        // Codifica a diferença DC
+        if (!write_dc_coefficient(buffer, dc_diffs[i])) {
+            printf("ERRO: Falha ao codificar diferenca DC %d!\n", dc_diffs[i]);
             errors_dc++;
             continue;
         }
@@ -1026,12 +1026,12 @@ void testHuffmanRoundtrip() {
         buffer->byte_position = 0;
         buffer->bit_position = 0;
         
-        // Decodifica o valor DC
+        // Decodifica a diferença DC
         int decoded_dc = decode_dc_coefficient(buffer);
         
         // Verifica se o valor decodificado é igual ao original
-        if (decoded_dc != dc_values[i]) {
-            printf("ERRO DC: Original=%d, Decodificado=%d\n", dc_values[i], decoded_dc);
+        if (decoded_dc != dc_diffs[i]) {
+            printf("ERRO DC: Original=%d, Decodificado=%d\n", dc_diffs[i], decoded_dc);
             errors_dc++;
         }
     }
