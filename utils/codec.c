@@ -421,38 +421,29 @@ void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACR
 }
 
 void rle_encode_block(BLOCO_RLE_DIFERENCIAL* rle_block, VETORZIGZAG* zigzag_block) {
+    /*
+     * Converte um bloco vetorizado em zigue-zague em um bloco codificado por carreira.
+     */
     rle_block->quantidade = 0;
-    int zeros_count = 0;
-    rle_block->coeficiente_dc = (int)round(zigzag_block->vector[0]);
+    int quantidade_zeros = 0;
 
-    // Loop through all 63 AC coefficients to generate RLE pairs.
-    for (int i = 1; i < 64; i++) {
-        // Stop if the pairs array is almost full (leave space for EOB).
-        if (rle_block->quantidade >= 63) break;
+    rle_block->coeficiente_dc = zigzag_block->vector[0];
 
+    for (int i = 1; i <= 63; i++) {
         if (fabs(zigzag_block->vector[i]) < 0.0001f) {
-            zeros_count++;
+            quantidade_zeros++;
         } else {
-            // Found a non-zero value. Handle preceding zeros.
-            while (zeros_count >= 16) {
-                if (rle_block->quantidade >= 63) break;
-                // Emit a ZRL code: (run of 15 zeros, value of 0).
-                rle_block->pares[rle_block->quantidade].zeros = 15;
-                rle_block->pares[rle_block->quantidade].valor = 0;
-                rle_block->quantidade++;
-                zeros_count -= 16;
+            if (rle_block->quantidade < 63) {
+                 rle_block->pares[rle_block->quantidade].zeros = quantidade_zeros;
+                 rle_block->pares[rle_block->quantidade].valor = zigzag_block->vector[i];
+                 rle_block->quantidade++;
+                 quantidade_zeros = 0;
+            } else {
+                 break;
             }
-            if (rle_block->quantidade >= 63) break;
-
-            // Emit the pair for the non-zero value and the remaining zero run.
-            rle_block->pares[rle_block->quantidade].zeros = zeros_count;
-            rle_block->pares[rle_block->quantidade].valor = zigzag_block->vector[i];
-            rle_block->quantidade++;
-            zeros_count = 0;
         }
     }
-
-    // Always terminate the block with an EOB marker.
+    // Colocar EOB
     if (rle_block->quantidade < 64) {
         rle_block->pares[rle_block->quantidade].zeros = 0;
         rle_block->pares[rle_block->quantidade].valor = 0.0f;
