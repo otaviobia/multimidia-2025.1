@@ -12,7 +12,7 @@ int main(void) {
     float quality = 50; // Qualidade da quantização (50 é o padrão)
 
     // 1. Abre o arquivo BMP de entrada
-    FILE *input = fopen("images/256x256.bmp", "rb");
+    FILE *input = fopen("images/lenna.bmp", "rb");
     if (!input) {
         printf("Error: could not open input file.\n");
         return 1;
@@ -43,9 +43,9 @@ int main(void) {
     PIXELYCBCR *PixelsYCbCr = (PIXELYCBCR *) malloc(tam * sizeof(PIXELYCBCR));
     convertToYCBCR(Pixels, PixelsYCbCr, tam);
 
-    testImageWithoutDCT(PixelsYCbCr, width, height, FileHeader, InfoHeader);
+    //testImageWithoutDCT(PixelsYCbCr, width, height, FileHeader, InfoHeader);
 
-    testImageSubsampling(PixelsYCbCr, width, height);
+    //testImageSubsampling(PixelsYCbCr, width, height);
 
     // 6. Aplica a DCT e retorna os macroblocos de 16x16
     // Essa função também faz a subamostragem 4:2:0
@@ -64,6 +64,19 @@ int main(void) {
     MACROBLOCO_RLE_DIFERENCIAL* rle_diff_macroblocks = (MACROBLOCO_RLE_DIFERENCIAL *) malloc(macroblock_count * sizeof(MACROBLOCO_RLE_DIFERENCIAL));
     rle_encode_macroblocks(rle_diff_macroblocks, vectorized_macroblocks, macroblock_count);
     differential_encode_dc(rle_diff_macroblocks, macroblock_count);
+
+    // Teste 1: Codificação DC por categoria
+    testDCCategoryEncoding(rle_diff_macroblocks, macroblock_count);
+    
+    // Teste 2: Codificação AC por categoria
+    testACCategoryEncoding(rle_diff_macroblocks, macroblock_count);
+    
+    // Teste 3: Teste de roundtrip (codifica e decodifica para verificar reversibilidade)
+    testCategoryEncodingRoundtrip(rle_diff_macroblocks, macroblock_count);
+
+    testBitBufferSimple();
+    testBitBufferExtensive();
+    testHuffmanRoundtrip();
 
     /* DESCOMPRESSÃO */
     // 1. Desaplica codificação por diferencial e por carreira
@@ -95,6 +108,8 @@ int main(void) {
     saveChannelImages(DecodedYCbCr, width, height, FileHeader, InfoHeader);
     fclose(output);
 
+    // Teste final: Compara a imagem original com a reconstituída
+    compareRGB(Pixels, PixelsOut, tam);
     // Libera a memória alocada
     free(Pixels);
     free(PixelsOut);
