@@ -1125,3 +1125,22 @@ void testHuffmanRoundtrip() {
     free_bit_buffer(buffer);
     printf("********************************************\n\n");
 }
+
+long fsize(const char *filename)
+{
+    /*
+     * Retorna o tamanho do arquivo em bytes.
+     * 
+     * Parâmetros:
+     * filename: caminho do arquivo
+     */
+    FILE *fp = fopen(filename, "rb");
+    if (!fp) {
+        perror("Erro ao abrir arquivo");
+        return -1;  // Retorna -1 em caso de erro
+    }
+    long size;
+    fseek(fp, 0, SEEK_END);
+    size = ftell(fp);
+    return size;
+}

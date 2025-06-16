@@ -24,5 +24,6 @@
     void testBitBufferSimple();
     void testBitBufferExtensive();
     void testHuffmanRoundtrip();
+    long fsize(const char *filename);
 
 #endif

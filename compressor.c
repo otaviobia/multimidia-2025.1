@@ -10,6 +10,7 @@
 #include "utils/bitmap.h"
 #include "utils/codec.h"
 #include "utils/huffman.h"
+#include "utils/test.h"
 
 int main(int argc, char *argv[]) {
     // Verifica se o número de argumentos está correto e exibe a mensagem de uso correto
@@ -95,13 +96,15 @@ int main(int argc, char *argv[]) {
     // 8. Aplica a codificação Huffman e escreve os macroblocos comprimidos em um arquivo binário
     write_macroblocks_huffman(output_filename, rle_diff_macroblocks, macroblock_count, file_header, info_header, quality);
 
+    printf("Imagem comprimida com sucesso para %s\n", output_filename);
+    printf("O arquivo comprimido eh %.2f%% menor que a imagem original.\n", (1.0f - (float)fsize(output_filename) / fsize(input_filename)) * 100.0f);
+
     // 9. Limpa a memória alocada
     free(pixels_rgb);
     free(pixels_ycbcr);
     free(macroblocks);
     free(vectorized_macroblocks);
     free(rle_diff_macroblocks);
-    
-    printf("Imagem comprimida com sucesso para %s\n", output_filename);
+
     return 0;
 }
