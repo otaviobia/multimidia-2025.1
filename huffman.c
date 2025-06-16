@@ -154,6 +154,11 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
         return write_bits(buffer, zrl->code_value, zrl->code_length);
     }
     
+    // Se o ac_value é zero, mas não é EOB ou ZRL, é um erro/n existe na tabela fornecida
+    if (ac_value == 0) {
+        return 0;  // Combinação inválida em JPEG RLE
+    }
+    
     // Trata sequências longas de zeros (>15) usando ZRL
     while (run_length > 15) {
         // ZRL - Zero Run Length (15,0)
@@ -204,8 +209,8 @@ int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
         int zeros = block->pares[i].zeros;
         int valor = (int)round(block->pares[i].valor);
         
-        // Se valor é zero e estamos no final, é EOB
-        if (valor == 0 && i == block->quantidade - 1) {
+        // Se temos o par (0,0), é um EOB
+        if (block->pares[i].zeros == 0 && block->pares[i].valor == 0.0f) {
             return write_ac_coefficient(buffer, 0, 0);
         }
         
@@ -337,7 +342,7 @@ int decode_dc_huffman(BitBuffer* buffer) {
         bits_read++;
         
         // Verifica se este código corresponde a uma categoria DC
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i <= 10; i++) {
             const HuffmanEntry* entry = &JPEG_DC_LUMINANCE_TABLE[i];
             if (entry->code_length == bits_read && 
                 entry->code_value == current_code) {
@@ -377,6 +382,16 @@ int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category) {
         if (bit < 0) return -1; // Erro de leitura
         
         current_code = (current_code << 1) | bit;
+         /* 
+         * Construindo o código Huffman bit a bit:
+         * 1. (current_code << 1) - Desloca os bits já lidos para a esquerda
+         *    Ex: se current_code=101 -> após shift: 1010
+         * 
+         * 2. | bit - Adiciona o novo bit na posição menos significativa usando OR
+         *    Ex: se bit=1 -> 1010|1 = 1011
+         * 
+         * Assim vamos acumulando bits sequencialmente: 1 -> 10 -> 101 -> 1011...
+         */
         bits_read++;
         
         // Procura na tabela AC
