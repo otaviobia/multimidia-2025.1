@@ -1,6 +1,7 @@
 #include "huffman.h"
 #include "codec.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
 
@@ -142,91 +143,65 @@ int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
 
 // Escreve um coeficiente AC no buffer
 int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
-    // EOB - End of Block (0,0)
-    if (run_length == 0 && ac_value == 0) {
-        const HuffmanEntry* entry = &JPEG_AC_LUMINANCE_MATRIX[0][0];
-        return write_bits(buffer, entry->code_value, entry->code_length);
+    // The RLE function now guarantees run_length is always valid (0-15).
+    // EOB (0,0) and ZRL (15,0) are handled by a direct table lookup.
+
+    // A run/value pair where the value is 0 but it's not EOB or ZRL is invalid.
+    if (ac_value == 0 && run_length != 0 && run_length != 15) {
+        return 0;
     }
-    
-    // ZRL - Zero Run Length (15,0)
-    if (run_length == 15 && ac_value == 0) {
-        const HuffmanEntry* zrl = &JPEG_AC_LUMINANCE_MATRIX[15][0];
-        return write_bits(buffer, zrl->code_value, zrl->code_length);
-    }
-    
-    // Se o ac_value é zero, mas não é EOB ou ZRL, é um erro/n existe na tabela fornecida
-    if (ac_value == 0) {
-        return 0;  // Combinação inválida em JPEG RLE
-    }
-    
-    // Trata sequências longas de zeros (>15) usando ZRL
-    while (run_length > 15) {
-        // ZRL - Zero Run Length (15,0)
-        const HuffmanEntry* zrl = &JPEG_AC_LUMINANCE_MATRIX[15][0];
-        if (!write_bits(buffer, zrl->code_value, zrl->code_length)) {
-            return 0;
-        }
-        run_length -= 16;
-    }
-    
-    // Categoria do valor AC
+
+    // Get the category for the AC magnitude.
     int category = get_coefficient_category(ac_value);
-    if (category > 10) category = 10;  // Limita a tabela disponível
-    
-    // Obtem o código Huffman para o par (run, category)
+    if (category > 10) category = 10; // Clamp to max category in table.
+
+    // Get the Huffman code for the (run, category) pair.
     const HuffmanEntry* entry = &JPEG_AC_LUMINANCE_MATRIX[run_length][category];
-    
-    // Verifica se este par tem entrada na tabela
+
     if (entry->code_length == 0) {
-        return 0;  // Combinação inválida
+        // This pair does not have a Huffman code in the provided table.
+        return 0;
     }
-    
-    // Escreve o prefixo Huffman para o par (run, category)
+
+    // Write the Huffman prefix code for the pair.
     if (!write_bits(buffer, entry->code_value, entry->code_length)) {
         return 0;
     }
-    
-    // Codifica o valor AC dentro da categoria
-    int encoded_value = get_coefficient_code(ac_value, category);
-    
-    // Escreve o valor codificado
-    if (!write_bits(buffer, encoded_value, category)) {
-        return 0;
+
+    // If the value was non-zero, write the bits for the value itself.
+    if (category > 0) {
+        int encoded_value = get_coefficient_code(ac_value, category);
+        if (!write_bits(buffer, encoded_value, category)) {
+            return 0;
+        }
     }
-    
+
     return 1;
 }
 
 // Codifica um bloco RLE usando Huffman
 int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
-    // Codifica o coeficiente DC
+    // 1. Encode the DC coefficient first.
     if (!write_dc_coefficient(buffer, block->coeficiente_dc)) {
         return 0;
     }
-    
-    // Codifica os pares AC (zeros, valor)
+
+    // 2. Loop through ALL generated RLE pairs and encode them.
+    // The previous RLE step guarantees the last pair is the EOB marker.
+    // This loop ensures every single one, including the EOB, gets processed.
     for (int i = 0; i < block->quantidade; i++) {
-        int zeros = block->pares[i].zeros;
-        int valor = (int)round(block->pares[i].valor);
-        
-        // Se temos o par (0,0), é um EOB
-        if (block->pares[i].zeros == 0 && block->pares[i].valor == 0.0f) {
-            return write_ac_coefficient(buffer, 0, 0);
-        }
-        
-        // Codifica o par AC
-        if (!write_ac_coefficient(buffer, zeros, valor)) {
+        int run = block->pares[i].zeros;
+        int value = (int)round(block->pares[i].valor);
+
+        // Pass the pair to the AC writer, which knows how to handle
+        // regular values, ZRL (15,0), and EOB (0,0).
+        if (!write_ac_coefficient(buffer, run, value)) {
             return 0;
         }
     }
-    
-    // Se não terminou com EOB explícito, adiciona um
-    if (block->quantidade == 0 || 
-        !(block->pares[block->quantidade-1].zeros == 0 && 
-          block->pares[block->quantidade-1].valor == 0.0f)) {
-        return write_ac_coefficient(buffer, 0, 0);
-    }
-    
+
+    // 3. Since the loop processes all pairs, the EOB is now guaranteed
+    // to be in the bitstream.
     return 1;
 }
 
@@ -267,53 +242,29 @@ size_t get_huffman_buffer_size(BitBuffer* buffer) {
 
 // Lê bits do buffer
 int read_bits(BitBuffer* buffer, int num_bits) {
-    if (!buffer || num_bits <= 0) return -1; // Erro de parâmetros
-    
+    if (!buffer || num_bits <= 0) return -1;
+
     int value = 0;
     for (int i = 0; i < num_bits; i++) {
-        // Verifica se chegamos ao fim do buffer
         if (buffer->byte_position >= buffer->capacity) {
-            return -1; // Fim do buffer
+            printf("  -- !! read_bits ERROR: trying to read from byte %lu, but capacity is only %lu. --\n",
+                   (unsigned long)buffer->byte_position, (unsigned long)buffer->capacity);
+            return -1;
         }
-        
+
         value <<= 1;
-        /* 
-         * Esta operação multiplica 'value' por 2 (shift left por 1),
-         * movendo todos os bits para a esquerda e deixando um 0 no bit 
-         * menos significativo, que será preenchido pelo bit que vamos ler
-         */
-        
-        // Lê o bit atual
+
         if (buffer->data[buffer->byte_position] & (1 << (7 - buffer->bit_position))) {
             value |= 1;
         }
-        /* 
-         * Explicação detalhada:
-         * 1. (1 << (7 - buffer->bit_position)) cria uma máscara com apenas um bit ligado
-         *    Ex: se bit_position = 3:
-         *        7 - 3 = 4
-         *        1 << 4 = 00010000 (bit 4 ligado, contando da direita começando em 0)
-         * 
-         * 2. Os bytes são organizados com o MSB no bit 7 e o LSB no bit 0:
-         *    Posição:  7 6 5 4 3 2 1 0
-         *    Valor:    1 1 0 1 0 0 1 1  (exemplo)
-         * 
-         * 3. O AND bit-a-bit (&) com a máscara verifica se o bit específico está ligado
-         *    No exemplo acima, com bit_position=3:
-         *    11010011 & 00010000 = 00010000 (resultado não-zero)
-         * 
-         * 4. Se o resultado for não-zero, o bit está ligado, então
-         *    adicionamos 1 ao value usando OR bit-a-bit (value |= 1)
-         */
-        
-        // Avança para o próximo bit
+
         buffer->bit_position++;
         if (buffer->bit_position == 8) {
-            buffer->byte_position++;  // Avança para o próximo byte
-            buffer->bit_position = 0; // Recomeça do bit mais significativo
+            buffer->byte_position++;
+            buffer->bit_position = 0;
         }
     }
-    
+    //printf("  -- read_bits success, returning value=0x%X (%d) --\n", value, value);
     return value;
 }
 
@@ -321,95 +272,88 @@ int read_bits(BitBuffer* buffer, int num_bits) {
 int decode_dc_huffman(BitBuffer* buffer) {
     int bits_read = 0;
     int current_code = 0;
-    
-    // Lê bits um por um até encontrar um código válido
+    //printf("\n--- Decoding DC ---\n");
+
     while (bits_read < MAX_HUFFMAN_CODE_LENGTH) {
-        // Lê um bit
         int bit = read_bits(buffer, 1);
-        if (bit < 0) return -1; // Erro de leitura ou fim do buffer
-        
+        if (bit < 0) {
+            printf("  [ERROR] read_bits failed or hit end of buffer.\n");
+            return -1;
+        }
+
         current_code = (current_code << 1) | bit;
-        /* 
-         * Construindo o código Huffman bit a bit:
-         * 1. (current_code << 1) - Desloca os bits já lidos para a esquerda
-         *    Ex: se current_code=101 -> após shift: 1010
-         * 
-         * 2. | bit - Adiciona o novo bit na posição menos significativa usando OR
-         *    Ex: se bit=1 -> 1010|1 = 1011
-         * 
-         * Assim vamos acumulando bits sequencialmente: 1 -> 10 -> 101 -> 1011...
-         */
         bits_read++;
-        
-        // Verifica se este código corresponde a uma categoria DC
+        //printf("  Read bit: %d  ->  current_code=0x%X (length %d)\n", bit, current_code, bits_read);
+
         for (int i = 0; i <= 10; i++) {
             const HuffmanEntry* entry = &JPEG_DC_LUMINANCE_TABLE[i];
-            if (entry->code_length == bits_read && 
-                entry->code_value == current_code) {
-                return i; // Retorna a categoria ao encontrar correspondência exata
+            if (entry->code_length == bits_read && entry->code_value == current_code) {
+                //printf("  >>> MATCH FOUND! Category: %d\n", i);
+                return i;
             }
         }
     }
-    
-    return -1; // Código inválido - não encontrou nas tabelas ou excedeu comprimento máximo
+
+    printf("  [ERROR] No DC match found for final code 0x%X\n", current_code);
+    return -1; // Code not found
 }
 
-// Decodifica um coeficiente DC
-int decode_dc_coefficient(BitBuffer* buffer) {
-    // Decodifica o símbolo Huffman para obter a categoria
-    int category = decode_dc_huffman(buffer);
-    if (category < 0) return -1; // Erro
-    
-    // Se for categoria 0, o valor é 0
-    if (category == 0) return 0;
-    
-    // Lê os bits adicionais que representam o valor
-    int additional_bits = read_bits(buffer, category);
-    if (additional_bits < 0) return -1; // Erro
-    
-    // Converte o código para o valor real
-    return decode_coefficient_from_category(category, additional_bits);
-}
-
-// Decodifica um par AC (run, category)
 int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category) {
     int bits_read = 0;
     int current_code = 0;
-    
-    // Lê bits um por um até encontrar um código válido
+    //printf("\n--- Decoding AC ---\n");
+
     while (bits_read < MAX_HUFFMAN_CODE_LENGTH) {
         int bit = read_bits(buffer, 1);
-        if (bit < 0) return -1; // Erro de leitura
-        
+        if (bit < 0) {
+            printf("  [ERROR] read_bits failed or hit end of buffer.\n");
+            return 0;
+        }
+
         current_code = (current_code << 1) | bit;
-         /* 
-         * Construindo o código Huffman bit a bit:
-         * 1. (current_code << 1) - Desloca os bits já lidos para a esquerda
-         *    Ex: se current_code=101 -> após shift: 1010
-         * 
-         * 2. | bit - Adiciona o novo bit na posição menos significativa usando OR
-         *    Ex: se bit=1 -> 1010|1 = 1011
-         * 
-         * Assim vamos acumulando bits sequencialmente: 1 -> 10 -> 101 -> 1011...
-         */
         bits_read++;
-        
-        // Procura na tabela AC
+        //printf("  Read bit: %d  ->  current_code=0x%X (length %d)\n", bit, current_code, bits_read);
+
         for (int run = 0; run < 16; run++) {
             for (int cat = 0; cat < 11; cat++) {
                 const HuffmanEntry* entry = &JPEG_AC_LUMINANCE_MATRIX[run][cat];
-                if (entry->code_length == bits_read && 
-                    entry->code_value == current_code) {
+                // Check against non-empty table entries
+                if (entry->code_length > 0 && entry->code_length == bits_read && entry->code_value == current_code) {
+                    //printf("  >>> MATCH FOUND! Run/Category: (%d, %d)\n", run, cat);
                     *run_length = run;
                     *category = cat;
-                    return 1; // Sucesso
+                    return 1; // Success
                 }
             }
         }
     }
-    
-    return 0; // Não encontrou
+
+    printf("  [ERROR] No AC match found for final code 0x%X\n", current_code);
+    return 0; // Not found
 }
+
+// Decodifica um coeficiente DC
+int decode_dc_coefficient(int* result_val, BitBuffer* buffer) {
+    int category = decode_dc_huffman(buffer);
+    if (category < 0) {
+        return 0; // Return 0 for failure
+    }
+
+    if (category == 0) {
+        *result_val = 0;
+        return 1; // Return 1 for success
+    }
+
+    int additional_bits = read_bits(buffer, category);
+    if (additional_bits < 0) {
+        return 0; // Return 0 for failure
+    }
+
+    *result_val = decode_coefficient_from_category(category, additional_bits);
+    return 1; // Return 1 for success
+}
+
+
 
 // Decodifica um coeficiente AC
 int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value) {
@@ -446,39 +390,40 @@ int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value) {
 
 // Decodifica um bloco inteiro
 int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
-    // Decodifica o coeficiente DC
-    int dc = decode_dc_coefficient(buffer);
-    if (dc < 0) return 0;
-    
-    block->coeficiente_dc = dc;
+    // Decodes the DC coefficient using the new, safer function signature.
+    int dc_value;
+    if (!decode_dc_coefficient(&dc_value, buffer)) {
+        return 0; // The call failed
+    }
+    block->coeficiente_dc = dc_value; // Assign the valid (positive or negative) value
+
+    // AC decoding logic remains the same...
     block->quantidade = 0;
-    
-    // Decodifica coeficientes AC até encontrar EOB
     int pos = 0;
-    while (pos < 63) { // Máximo de 63 coeficientes AC
+    while (pos < 63) {
         int run_length, value;
         int result = decode_ac_coefficient(buffer, &run_length, &value);
-        
-        if (result == 0) return 0; // Erro
-        if (result == 2) break; // EOB
-        
-        // Para ZRL, apenas avançamos a posição
-        if (result == 3) {
+
+        if (result == 0) return 0; // Error
+        if (result == 2) break;    // EOB
+
+        if (result == 3) { // ZRL
             pos += 16;
             continue;
         }
-        
-        // Avança a posição pelo número de zeros
+
         pos += run_length;
         if (pos >= 63) break;
-        
-        // Adiciona o par (run_length, value) ao bloco
-        block->pares[block->quantidade].zeros = run_length;
-        block->pares[block->quantidade].valor = (float)value;
-        block->quantidade++;
+
+        if(block->quantidade < 63) {
+            block->pares[block->quantidade].zeros = run_length;
+            block->pares[block->quantidade].valor = (float)value;
+            block->quantidade++;
+        }
+        pos++;
     }
-    
-    return 1;
+
+    return 1; // Success
 }
 
 // Decodifica um macrobloco completo
@@ -507,4 +452,167 @@ MACROBLOCO_RLE_DIFERENCIAL* huffman_decode_macroblock(BitBuffer* buffer) {
     }
     
     return macroblock;
+}
+
+int huffman_decode_macroblock_to_dest(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* dest_macroblock) {
+    if (!dest_macroblock) return 0;
+    
+    // Decode Y (luminance) blocks
+    for (int i = 0; i < 4; i++) {
+        if (!huffman_decode_block(buffer, &dest_macroblock->Y_vetor[i])) {
+            return 0;
+        }
+    }
+    
+    // Decode Cb (chroma blue) block
+    if (!huffman_decode_block(buffer, &dest_macroblock->Cb_vetor)) {
+        return 0;
+    }
+    
+    // Decode Cr (chroma red) block
+    if (!huffman_decode_block(buffer, &dest_macroblock->Cr_vetor)) {
+        return 0;
+    }
+    
+    return 1; // Success
+}
+
+void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, float quality) {
+    FILE *output_file = fopen(output_filename, "wb");
+    if (!output_file) {
+        perror("Error opening output file for writing");
+        return;
+    }
+
+    // --- Write Headers (Member by Member) ---
+    // Change all "file_header->" to "file_header." and "info_header->" to "info_header."
+    fwrite(&file_header.Type, sizeof(file_header.Type), 1, output_file);
+    fwrite(&file_header.Size, sizeof(file_header.Size), 1, output_file);
+    fwrite(&file_header.Reserved1, sizeof(file_header.Reserved1), 1, output_file);
+    fwrite(&file_header.Reserved2, sizeof(file_header.Reserved2), 1, output_file);
+    fwrite(&file_header.OffBits, sizeof(file_header.OffBits), 1, output_file);
+    
+    fwrite(&info_header.Size, sizeof(info_header.Size), 1, output_file);
+    fwrite(&info_header.Width, sizeof(info_header.Width), 1, output_file);
+    fwrite(&info_header.Height, sizeof(info_header.Height), 1, output_file);
+    fwrite(&info_header.Planes, sizeof(info_header.Planes), 1, output_file);
+    fwrite(&info_header.BitCount, sizeof(info_header.BitCount), 1, output_file);
+    fwrite(&info_header.Compression, sizeof(info_header.Compression), 1, output_file);
+    fwrite(&info_header.SizeImage, sizeof(info_header.SizeImage), 1, output_file);
+    fwrite(&info_header.XResolution, sizeof(info_header.XResolution), 1, output_file);
+    fwrite(&info_header.YResolution, sizeof(info_header.YResolution), 1, output_file);
+    fwrite(&info_header.NColours, sizeof(info_header.NColours), 1, output_file);
+    fwrite(&info_header.ImportantColours, sizeof(info_header.ImportantColours), 1, output_file);
+    
+    // --- Write Custom Data ---
+    uint32_t mc = (uint32_t)macroblock_count;
+    fwrite(&quality, sizeof(float), 1, output_file);
+    fwrite(&mc, sizeof(uint32_t), 1, output_file);
+    
+    // --- The rest of the function remains the same ---
+    for (int i = 0; i < macroblock_count; i++) {
+        BitBuffer *buffer = huffman_encode_macroblock(&rle_macroblocks[i]);
+        if (!buffer) {
+            fprintf(stderr, "Error: Failed to Huffman encode macroblock %d\n", i);
+            continue;
+        }
+
+        size_t buffer_size = get_huffman_buffer_size(buffer);
+
+        //printf("  Writing MB %d, size: %lu bytes\n", i, (unsigned long)buffer_size);
+
+        fwrite(&buffer_size, sizeof(size_t), 1, output_file); // Write size of the chunk
+        fwrite(buffer->data, sizeof(uint8_t), buffer_size, output_file); // Write data
+        
+        free_bit_buffer(buffer);
+    }
+
+    fclose(output_file);
+    printf("Compressed data written to %s\n", output_filename);
+}
+
+void print_bytes(const uint8_t* data, size_t size) {
+    printf("Buffer data (%llu bytes): ", size);
+    size_t limit = size > 32 ? 32 : size; // Print at most 32 bytes
+    for(size_t i = 0; i < limit; i++) {
+        printf("%02X ", data[i]);
+    }
+    if (size > 32) {
+        printf("...");
+    }
+    printf("\n");
+}
+
+int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, float *quality_lida) {
+    FILE *input_file = fopen(input_filename, "rb");
+    if (!input_file) {
+        perror("Error opening input file for reading");
+        return 0;
+    }
+
+    // --- 1. Read Headers (Field by Field) ---
+    // (This part is correct and can remain as is, with or without the prints)
+    fread(&fhead->Type, sizeof(fhead->Type), 1, input_file);
+    fread(&fhead->Size, sizeof(fhead->Size), 1, input_file);
+    fread(&fhead->Reserved1, sizeof(fhead->Reserved1), 1, input_file);
+    fread(&fhead->Reserved2, sizeof(fhead->Reserved2), 1, input_file);
+    fread(&fhead->OffBits, sizeof(fhead->OffBits), 1, input_file);
+    fread(&ihead->Size, sizeof(ihead->Size), 1, input_file);
+    fread(&ihead->Width, sizeof(ihead->Width), 1, input_file);
+    fread(&ihead->Height, sizeof(ihead->Height), 1, input_file);
+    fread(&ihead->Planes, sizeof(ihead->Planes), 1, input_file);
+    fread(&ihead->BitCount, sizeof(ihead->BitCount), 1, input_file);
+    fread(&ihead->Compression, sizeof(ihead->Compression), 1, input_file);
+    fread(&ihead->SizeImage, sizeof(ihead->SizeImage), 1, input_file);
+    fread(&ihead->XResolution, sizeof(ihead->XResolution), 1, input_file);
+    fread(&ihead->YResolution, sizeof(ihead->YResolution), 1, input_file);
+    fread(&ihead->NColours, sizeof(ihead->NColours), 1, input_file);
+    fread(&ihead->ImportantColours, sizeof(ihead->ImportantColours), 1, input_file);
+    uint32_t mc;
+    fread(quality_lida, sizeof(float), 1, input_file);
+    fread(&mc, sizeof(uint32_t), 1, input_file);
+    *count_lido = (int)mc;
+
+    // --- 2. Allocate Memory ---
+    *blocos_lidos = (MACROBLOCO_RLE_DIFERENCIAL *)malloc((*count_lido) * sizeof(MACROBLOCO_RLE_DIFERENCIAL));
+    if (!*blocos_lidos) {
+        fprintf(stderr, "Error: Memory allocation failed for macroblocks.\n");
+        fclose(input_file);
+        return 0;
+    }
+
+    // --- 3. Read and Decode All Macroblocks in a Single, Clean Loop ---
+    printf("\n--- DECOMPRESSOR: Reading and Decoding All Macroblocks ---\n");
+    for (int i = 0; i < (*count_lido); i++) {
+        size_t buffer_size;
+        if (fread(&buffer_size, sizeof(size_t), 1, input_file) != 1) {
+             fprintf(stderr, "[MB %d] FATAL: Could not read size for chunk.\n", i);
+             free(*blocos_lidos);
+             fclose(input_file);
+             return 0;
+        }
+        //printf("  [MB %d] Reading chunk, expecting size: %llu bytes\n", i, (unsigned long long)buffer_size);
+
+        BitBuffer *buffer = init_bit_buffer(buffer_size);
+        if (fread(buffer->data, 1, buffer_size, input_file) != buffer_size) {
+            fprintf(stderr, "[MB %d] FATAL: Could not read %llu bytes of data.\n", i, (unsigned long long)buffer_size);
+            free_bit_buffer(buffer);
+            free(*blocos_lidos);
+            fclose(input_file);
+            return 0;
+        }
+
+        if (!huffman_decode_macroblock_to_dest(buffer, &((*blocos_lidos)[i]))) {
+            fprintf(stderr, "[MB %d] FATAL: Failed to decode Huffman data.\n", i);
+            //free_bit_buffer(buffer);
+            //free(*blocos_lidos);
+            //fclose(input_file);
+            //return 0;
+        }
+        free_bit_buffer(buffer);
+    }
+    printf("--- All macroblocks decoded successfully ---\n\n");
+
+    fclose(input_file);
+    return 1;
 }

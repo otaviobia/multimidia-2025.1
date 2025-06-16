@@ -1,11 +1,9 @@
-all: main.o bitmap.o dct.o test.o codec.o huffman.o
-	gcc -Wall -std=c99 -o main main.o bitmap.o test.o dct.o codec.o huffman.o -lm
+all: bitmap.o dct.o test.o codec.o huffman.o
+	gcc -Wall -std=c99 -o compressor compressor.c bitmap.o dct.o codec.o huffman.o -lm
+	gcc -Wall -std=c99 -o decompressor decompressor.c bitmap.o dct.o codec.o huffman.o -lm
 
 dct.o: dct.c dct.h
 	gcc -Wall -std=c99 -c dct.c
-
-main.o: main.c bitmap.h
-	gcc -Wall -std=c99 -c main.c
 
 bitmap.o: bitmap.c bitmap.h
 	gcc -Wall -std=c99 -c bitmap.c
@@ -23,4 +21,4 @@ run:
 	./main
 
 clean:
-	rm -f *.o main *.exe *.bmp
+	rm -f compressor decompressor *.o *.exe *.bmp *.bin

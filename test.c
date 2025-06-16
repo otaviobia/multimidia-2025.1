@@ -781,7 +781,7 @@ void printBitsInBuffer(BitBuffer* buffer) {
         printf(" ");
     }
     printf("\n");
-    printf("Posicao atual: byte %zu, bit %d\n", buffer->byte_position, buffer->bit_position);
+    printf("Posicao atual: byte %llu, bit %d\n", buffer->byte_position, buffer->bit_position);
 }
 
 void testBitBufferSimple() {
@@ -958,7 +958,7 @@ void testBitBufferExtensive() {
     total_tests++;
     
     // Verifica a capacidade do buffer após o crescimento
-    printf("Capacidade do buffer apos crescimento: %zu bytes\n", buffer->capacity);
+    printf("Capacidade do buffer apos crescimento: %llu bytes\n", buffer->capacity);
     
     // Reseta para leitura
     buffer->byte_position = 0;
@@ -1026,11 +1026,12 @@ void testHuffmanRoundtrip() {
         buffer->byte_position = 0;
         buffer->bit_position = 0;
         
-        // Decodifica a diferença DC
-        int decoded_dc = decode_dc_coefficient(buffer);
+        // Decodifica a diferença DC usando a nova assinatura
+        int decoded_dc;
+        int success = decode_dc_coefficient(&decoded_dc, buffer);
         
-        // Verifica se o valor decodificado é igual ao original
-        if (decoded_dc != dc_diffs[i]) {
+        // Verifica se a decodificação foi bem-sucedida e se o valor é igual ao original
+        if (!success || decoded_dc != dc_diffs[i]) {
             printf("ERRO DC: Original=%d, Decodificado=%d\n", dc_diffs[i], decoded_dc);
             errors_dc++;
         }

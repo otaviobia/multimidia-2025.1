@@ -8,13 +8,20 @@
     // Tamanho máximo do código Huffman no padrão JPEG (16 bits)
     #define MAX_HUFFMAN_CODE_LENGTH 16
     
+    // Estrutura para cabeçalho de arquivo BMP
+    typedef struct {
+        BITMAPFILEHEADER file_header;
+        BITMAPINFOHEADER info_header;
+        float quality;
+        uint32_t macroblock_count;
+    } COMPRESSED_HEADER;
+
     // Estrutura para entrada da tabela Huffman
     typedef struct {
         char code[MAX_HUFFMAN_CODE_LENGTH + 1]; // Código binário como string
         int code_length;                        // Comprimento do código em bits
         int code_value;                    // Valor do código como inteiro
     } HuffmanEntry;
-
 
     // Estrutura para estatísticas de símbolos
     typedef struct {
@@ -45,11 +52,16 @@
 
     // Funções de decodificação Huffman
     int decode_dc_huffman(BitBuffer* buffer);
-    int decode_dc_coefficient(BitBuffer* buffer);
+    int decode_dc_coefficient(int* result_val, BitBuffer* buffer);
     int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category);
     int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value);
     int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block);
     MACROBLOCO_RLE_DIFERENCIAL* huffman_decode_macroblock(BitBuffer* buffer);
+
+    // Funções de leitura e escrita de macroblocos
+    void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, float quality);
+    int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, float *quality_lida);
+    int huffman_decode_macroblock_to_dest(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* dest_macroblock);
 
     // Tabela DC - Fornecida
     static const HuffmanEntry JPEG_DC_LUMINANCE_TABLE[11] = {
