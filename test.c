@@ -1002,8 +1002,8 @@ void testHuffmanRoundtrip() {
         return;
     }
     
-    // 1. Teste de coeficientes DC (usando diferenças, não valores absolutos)
-    int dc_diffs[] = {0, 1, -1, 15, -15, 64, -64, 127, -127, 255, -255}; // Valores de diferença mais realistas
+    // 1. Teste de coeficientes DC
+    int dc_diffs[] = {0, 1, -1, 15, -15, 64, -64, 127, -127, 255, -255}; 
     int num_dc_values = sizeof(dc_diffs) / sizeof(dc_diffs[0]);
     int errors_dc = 0;
     
