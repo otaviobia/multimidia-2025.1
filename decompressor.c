@@ -1,37 +1,43 @@
+/*
+ * Descompressor de imagens BMP seguindo o padrão JPEG.
+ * Desenvolvido para a disciplina de Multimídia no 1º semestre de 2025.
+ * Componentes do grupo:
+ * - Otávio Biagioni Melo - nº USP: 15482604
+ * - Christyan Paniago Nantes — nº USP: 15635906
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "bitmap.h"
-#include "codec.h"
-#include "huffman.h"
-
-// This is the only function needed from test.c for the final output
-void compareRGB(const PIXELRGB *orig, const PIXELRGB *recon, int tam);
+#include "utils/bitmap.h"
+#include "utils/codec.h"
+#include "utils/huffman.h"
 
 int main(int argc, char *argv[]) {
+    // Verifica se o número de argumentos está correto e exibe a mensagem de uso correto
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s <input_file.bin> <output_image.bmp>\n", argv[0]);
+        printf("Uso correto: ./decompressor <comprimido.bin> <reconstruido.bmp>\n");
         return 1;
     }
 
     const char *input_filename = argv[1];
     const char *output_filename = argv[2];
 
-    // --- Decompression Pipeline ---
+    /* --- PIPELINE DE DESCOMPRESSÃO --- */
+    
     BITMAPFILEHEADER fhead;
     BITMAPINFOHEADER ihead;
     float quality_read;
     int count_read;
     MACROBLOCO_RLE_DIFERENCIAL *read_blocks = NULL;
 
+    // 1. Lê o arquivo comprimido e aplica decodificação huffman nos blocos de macroblocos 
     if (!read_macroblocks_huffman(input_filename, &read_blocks, &count_read, &fhead, &ihead, &quality_read)) {
-        fprintf(stderr, "Aborting: Failed to read and decode the compressed file.\n");
+        printf("Falha ao ler ou decodificar o arquivo comprimido.\n");
         if (read_blocks) free(read_blocks);
         return 1;
     }
-    printf("\n--- DECOMPRESSOR TRACE ---\n");
-    printf("[A] After Huffman Decode, MB 0, Cb DC value: %d\n", read_blocks[0].Cb_vetor.coeficiente_dc);
 
+    // Aloca memória para as estruturas intermediárias e inicializa variáveis
     MACROBLOCO_VETORIZADO *vectorized_macroblocks = (MACROBLOCO_VETORIZADO *)calloc(count_read, sizeof(MACROBLOCO_VETORIZADO));
     MACROBLOCO *macroblocks = (MACROBLOCO *)calloc(count_read, sizeof(MACROBLOCO));
     int width = ihead.Width;
@@ -41,40 +47,37 @@ int main(int argc, char *argv[]) {
     PIXELRGB *pixels_rgb = (PIXELRGB *)calloc(tam, sizeof(PIXELRGB));
 
     if (!vectorized_macroblocks || !macroblocks || !pixels_ycbcr || !pixels_rgb) {
-        fprintf(stderr, "Error: Memory allocation failed.\n");
+        printf("Erro ao alocar memória para estruturas auxiliares.\n");
         return 1;
     }
 
-    // 2. Differential and RLE Decode
+    // 2. Codificação diferencial dos valores DC e RLE nos AC dos macroblocos
     differential_decode_dc(read_blocks, count_read);
-    printf("[B] After Differential Decode, MB 0, Cb DC value: %d\n", read_blocks[0].Cb_vetor.coeficiente_dc);
     rle_decode_macroblocks(vectorized_macroblocks, read_blocks, count_read);
     
-    // 3. De-vectorize
+    // 3. Desvetorização zig-zag dos macroblocos
     devectorize_macroblocks(vectorized_macroblocks, macroblocks, count_read);
 
-    // 4. De-quantize
+    // 4. Dequantização dos macroblocos
     dequantizeMacroblocks(macroblocks, count_read, quality_read);
-    printf("[C] After Dequantization, MB 0, Cb DC value: %f\n", macroblocks[0].Cb.block[0][0]);
-    printf("--------------------------\n\n");
-    
-    // 5. Decode macroblocks to YCbCr image (Inverse DCT)
+
+    // 5. Inversa da DCT e reconstrução da imagem YCbCr
     decodeImageYCbCr(macroblocks, pixels_ycbcr, width, height);
 
-    // 6. Convert YCbCr -> RGB
+    // 6. Conversão YCbCr para RGB
     convertToRGB(pixels_ycbcr, pixels_rgb, tam);
     
-    // 7. Write to output BMP file
+    // 7. Escrita do arquivo BMP de saída
     FILE *output_file = fopen(output_filename, "wb");
     if (!output_file) {
-        perror("Error opening output BMP file");
+        printf("Erro ao abrir o arquivo de saída\n");
     } else {
         writeBMP(output_file, fhead, ihead, pixels_rgb);
         fclose(output_file);
-        printf("Decompressed image successfully written to %s\n", output_filename);
+        printf("Arquivo descomprimido com sucesso para %s\n", output_filename);
     }
     
-    // 8. Clean up
+    // 8. Limpeza de memória
     free(read_blocks);
     free(vectorized_macroblocks);
     free(macroblocks);

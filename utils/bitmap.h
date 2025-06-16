@@ -42,6 +42,7 @@
     void readHeader(FILE *F, BITMAPFILEHEADER *H);
     void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image);
     void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader);
+    void writeHeaders(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader);
     void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image);
     void convertToYCBCR(PIXELRGB *Image, PIXELYCBCR *ImageYCbCr, int tam);
     void convertToRGB(PIXELYCBCR *ImageYCbCr, PIXELRGB *Image, int tam);

@@ -4,6 +4,7 @@
     #include <stdio.h>
     #include <stdint.h>
     #include "codec.h"
+    #include "bitmap.h"
 
     // Tamanho máximo do código Huffman no padrão JPEG (16 bits)
     #define MAX_HUFFMAN_CODE_LENGTH 16
@@ -13,7 +14,7 @@
         BITMAPFILEHEADER file_header;
         BITMAPINFOHEADER info_header;
         float quality;
-        uint32_t macroblock_count;
+        int macroblock_count;
     } COMPRESSED_HEADER;
 
     // Estrutura para entrada da tabela Huffman
@@ -56,13 +57,12 @@
     int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category);
     int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value);
     int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block);
-    MACROBLOCO_RLE_DIFERENCIAL* huffman_decode_macroblock(BitBuffer* buffer);
+    int huffman_decode_macroblock(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* dest_macroblock);
 
     // Funções de leitura e escrita de macroblocos
     void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, float quality);
     int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, float *quality_lida);
-    int huffman_decode_macroblock_to_dest(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* dest_macroblock);
-
+    
     // Tabela DC - Fornecida
     static const HuffmanEntry JPEG_DC_LUMINANCE_TABLE[11] = {
         // binario  | comprimento | valor(binario em hexadecimal)
@@ -296,5 +296,4 @@
         {"1111111111111110", 16, 0xFFFE}, // (F,A)
     }
     };
-
 #endif

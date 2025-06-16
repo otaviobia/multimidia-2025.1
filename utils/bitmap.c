@@ -4,7 +4,7 @@
 void loadBMPHeaders (FILE *fp, BITMAPFILEHEADER *FileHeader, BITMAPINFOHEADER *InfoHeader) {
     /*
      * Lê os cabeçalhos do arquivo BMP, armazena as informações nas estruturas
-     * FileHeader e InfoHeader, e imprime os campos dessas estruturas.
+     * FileHeader e InfoHeader.
      */
     readHeader(fp, FileHeader);
     readInfoHeader(fp, InfoHeader);
@@ -15,8 +15,6 @@ void loadBMPHeaders (FILE *fp, BITMAPFILEHEADER *FileHeader, BITMAPINFOHEADER *I
         fclose(fp);
         return;
     }
-    
-    printHeaders(FileHeader, InfoHeader);
 }
 
 void readHeader(FILE *F, BITMAPFILEHEADER *H) {
@@ -89,9 +87,9 @@ void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image) {
     }
 }
 
-void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image) {
+void writeHeaders(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader) {
     /*
-     * Escreve os cabeçalhos e os pixels no arquivo de saída.
+     * Escreve os cabeçalhos do arquivo BMP no arquivo de saída.
      */
     fseek(output, 0, SEEK_SET);
     
@@ -114,6 +112,11 @@ void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHe
     fwrite(&InfoHeader.YResolution, sizeof (int), 1, output);
     fwrite(&InfoHeader.NColours, sizeof (unsigned int), 1, output);
     fwrite(&InfoHeader.ImportantColours, sizeof (unsigned int), 1, output);
+}
+
+void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image) {
+    // Escreve os cabeçalhos
+    writeHeaders(output, FileHeader, InfoHeader);
 
     // Escreve os pixels
     for (int i = 0; i < (InfoHeader.Height * InfoHeader.Width); i++) {
@@ -124,12 +127,19 @@ void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHe
 }
 
 unsigned char clampFloatToByte(float value) {
+    /*
+     * Clampa um valor float para o intervalo [0, 255] e converte para unsigned char.
+     * Se o valor for menor que 0, retorna 0. Se for maior que 255, retorna 255.
+     */
     if (value < 0.0f) return 0;
     if (value > 255.0f) return 255;
     return (unsigned char)(value + 0.5f); // arredonda
 }
 
 void convertToYCBCR(PIXELRGB *Image, PIXELYCBCR *ImageYCbCr, int tam) {
+    /* 
+     * Converte pixels de uma imagem RGB para YCbCr.
+     */
     for (int i = 0; i < tam; i++) {
         float R = Image[i].R;
         float G = Image[i].G;
@@ -146,6 +156,9 @@ void convertToYCBCR(PIXELRGB *Image, PIXELYCBCR *ImageYCbCr, int tam) {
 }
 
 void convertToRGB(PIXELYCBCR *ImageYCbCr, PIXELRGB *Image, int tam) {
+    /* 
+     * Converte pixels de uma imagem YCbCr para RGB.
+     */
     for (int i = 0; i < tam; i++) {
         float Y  = ImageYCbCr[i].Y;
         float Cb = ImageYCbCr[i].Cb - 128.0f;
