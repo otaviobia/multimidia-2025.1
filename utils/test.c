@@ -781,7 +781,7 @@ void printBitsInBuffer(BitBuffer* buffer) {
         printf(" ");
     }
     printf("\n");
-    printf("Posicao atual: byte %llu, bit %d\n", buffer->byte_position, buffer->bit_position);
+    printf("Posicao atual: byte %zu, bit %d\n", buffer->byte_position, buffer->bit_position);
 }
 
 void testBitBufferSimple() {
@@ -958,7 +958,7 @@ void testBitBufferExtensive() {
     total_tests++;
     
     // Verifica a capacidade do buffer após o crescimento
-    printf("Capacidade do buffer apos crescimento: %llu bytes\n", buffer->capacity);
+    printf("Capacidade do buffer apos crescimento: %zu bytes\n", buffer->capacity);
     
     // Reseta para leitura
     buffer->byte_position = 0;
