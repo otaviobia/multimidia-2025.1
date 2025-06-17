@@ -119,8 +119,10 @@ int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
     int original_dc = dc_diff;
     if (dc_diff > 4095) {
         dc_diff = 4095;
+        printf("AVISO: DC coeficiente %d clamped para %d (limite categoria 12)\n", original_dc, dc_diff);
     } else if (dc_diff < -4095) {
         dc_diff = -4095;
+        printf("AVISO: DC coeficiente %d clamped para %d (limite categoria 12)\n", original_dc, dc_diff);
     }
     
     // Determina a categoria do coeficiente
@@ -128,6 +130,7 @@ int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
     
     // Debug: verifica se a categoria está dentro dos limites
     if (category > 12) {
+        printf("ERRO: DC coeficiente %d ainda excede categoria 12 após clamp (categoria calculada: %d)\n", dc_diff, category);
         return 0;  // Erro crítico
     }
     
@@ -136,6 +139,7 @@ int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
     
     // Escreve o prefixo Huffman para a categoria
     if (!write_bits(buffer, entry->code_value, entry->code_length)) {
+        printf("Erro ao escrever prefixo Huffman para DC categoria %d\n", category);
         return 0;
     }
     
@@ -146,6 +150,7 @@ int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
         
         // Escreve o valor codificado
         if (!write_bits(buffer, encoded_value, category)) { // Retorna 0 se falhar
+            printf("Erro ao escrever valor codificado %d para DC categoria %d\n", encoded_value, category);
             return 0;
         }
     }
@@ -158,17 +163,26 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
     // EOB - End of Block (0,0)
     if (run_length == 0 && ac_value == 0) {
         const HuffmanEntry* entry = &JPEG_AC_LUMINANCE_MATRIX[0][0];
-        return write_bits(buffer, entry->code_value, entry->code_length);
+        if (!write_bits(buffer, entry->code_value, entry->code_length)) {
+            printf("Erro ao escrever EOB\n");
+            return 0;
+        }
+        return 1;
     }
     
     // ZRL - Zero Run Length (15,0)
     if (run_length == 15 && ac_value == 0) {
         const HuffmanEntry* zrl = &JPEG_AC_LUMINANCE_MATRIX[15][0];
-        return write_bits(buffer, zrl->code_value, zrl->code_length);
+        if (!write_bits(buffer, zrl->code_value, zrl->code_length)) {
+            printf("Erro ao escrever ZRL\n");
+            return 0;
+        }
+        return 1;
     }
     
     // Se o ac_value é zero, mas não é EOB ou ZRL, é um erro/n existe na tabela fornecida
     if (ac_value == 0) {
+        printf("Erro: Combinação inválida em JPEG RLE - run_length=%d, ac_value=0\n", run_length);
         return 0;  // Combinação inválida em JPEG RLE
     }
     
@@ -177,6 +191,7 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
         // ZRL - Zero Run Length (15,0)
         const HuffmanEntry* zrl = &JPEG_AC_LUMINANCE_MATRIX[15][0];
         if (!write_bits(buffer, zrl->code_value, zrl->code_length)) {
+            printf("Erro ao escrever ZRL durante run_length > 15\n");
             return 0;
         }
         run_length -= 16;
@@ -184,18 +199,22 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
     int original_ac = ac_value;
     if (ac_value > 1023) {
         ac_value = 1023;  // Max for category 10
+        printf("AVISO: AC coeficiente %d clamped para %d (limite categoria 10)\n", original_ac, ac_value);
     } else if (ac_value < -1023) {
         ac_value = -1023;  // Min for category 10
+        printf("AVISO: AC coeficiente %d clamped para %d (limite categoria 10)\n", original_ac, ac_value);
     }
     
     // Categoria do valor AC
     int category = get_coefficient_category(ac_value);
     if (category > 10) {
+        printf("AVISO: AC coeficiente %d excede categoria 10 (categoria calculada: %d). Limitando.\n", ac_value, category);
         category = 10;  // Limita a tabela disponível
     }
     
     // Verifica se run_length está dentro dos limites da tabela
     if (run_length > 15) {
+        printf("Erro: run_length %d excede limite da tabela AC (máximo 15)\n", run_length);
         return 0;
     }
     
@@ -204,7 +223,19 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
     
     // Verifica se este par tem entrada na tabela
     if (entry->code_length == 0) {
-        return 0;  // Combinação inválida
+        // Se categoria 11 não tem entrada para este run_length, tenta categoria 10
+        if (category == 11) {
+            printf("AVISO: Entrada AC (run=%d, cat=11) não disponível. Usando categoria 10 para AC valor %d.\n", run_length, ac_value);
+            category = 10;
+            entry = &JPEG_AC_LUMINANCE_MATRIX[run_length][category];
+            if (entry->code_length == 0) {
+                printf("Erro: Combinação inválida na tabela AC - run_length=%d, category=%d\n", run_length, category);
+                return 0;  // Combinação inválida
+            }
+        } else {
+            printf("Erro: Combinação inválida na tabela AC - run_length=%d, category=%d\n", run_length, category);
+            return 0;  // Combinação inválida
+        }
     }
     
     // Escreve o prefixo Huffman para o par (run, category)
@@ -240,11 +271,16 @@ int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
         
         // Se temos o par (0,0), é um EOB
         if (block->pares[i].zeros == 0 && block->pares[i].valor == 0.0f) {
-            return write_ac_coefficient(buffer, 0, 0);
+            if (!write_ac_coefficient(buffer, 0, 0)) {
+                printf("Erro ao codificar EOB\n");
+                return 0;
+            }
+            return 1;
         }
         
         // Codifica o par AC
         if (!write_ac_coefficient(buffer, zeros, valor)) {
+            printf("Erro ao codificar AC[%d]: zeros=%d, valor=%d\n", i, zeros, valor);
             return 0;
         }
     }
@@ -253,7 +289,10 @@ int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     if (block->quantidade == 0 || 
         !(block->pares[block->quantidade-1].zeros == 0 && 
           block->pares[block->quantidade-1].valor == 0.0f)) {
-        return write_ac_coefficient(buffer, 0, 0);
+        if (!write_ac_coefficient(buffer, 0, 0)) {
+            printf("Erro ao adicionar EOB final\n");
+            return 0;
+        }
     }
     
     return 1;
@@ -268,6 +307,7 @@ BitBuffer* huffman_encode_macroblock(MACROBLOCO_RLE_DIFERENCIAL* macroblock) {
     // Codifica os blocos Y (luminância)
     for (int i = 0; i < 4; i++) {
         if (!huffman_encode_block(buffer, &macroblock->Y_vetor[i])) {
+            printf("Erro ao codificar bloco Y[%d]. DC: %d\n", i, macroblock->Y_vetor[i].coeficiente_dc);
             free_bit_buffer(buffer);
             return NULL;
         }
@@ -275,12 +315,14 @@ BitBuffer* huffman_encode_macroblock(MACROBLOCO_RLE_DIFERENCIAL* macroblock) {
     
     // Codifica o bloco Cb (crominância azul)
     if (!huffman_encode_block(buffer, &macroblock->Cb_vetor)) {
+        printf("Erro ao codificar bloco Cb. DC: %d\n", macroblock->Cb_vetor.coeficiente_dc);
         free_bit_buffer(buffer);
         return NULL;
     }
     
     // Codifica o bloco Cr (crominância vermelha)
     if (!huffman_encode_block(buffer, &macroblock->Cr_vetor)) {
+        printf("Erro ao codificar bloco Cr. DC: %d\n", macroblock->Cr_vetor.coeficiente_dc);
         free_bit_buffer(buffer);
         return NULL;
     }
