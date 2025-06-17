@@ -265,7 +265,9 @@ void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quali
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
             quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * multiplier + 50) / 100;
+            if (quantization_matrix_y[i][j] < 1) quantization_matrix_y[i][j] = 1; // Garante que não seja menor que 1
             quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * multiplier + 50) / 100;
+            if (quantization_matrix_chroma[i][j] < 1) quantization_matrix_chroma[i][j] = 1; // Garante que não seja menor que 1
         }
     }
 
@@ -289,7 +291,9 @@ void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float qua
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
             quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * multiplier + 50) / 100;
+            if (quantization_matrix_y[i][j] < 1) quantization_matrix_y[i][j] = 1; // Garante que não seja menor que 1
             quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * multiplier + 50) / 100;
+            if (quantization_matrix_chroma[i][j] < 1) quantization_matrix_chroma[i][j] = 1; // Garante que não seja menor que 1
         }
     }
 
