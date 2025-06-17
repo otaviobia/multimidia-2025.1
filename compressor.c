@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
 
     const char *input_filename = argv[1];
     const char *output_filename = argv[2];
-    float quality = 50.0f; // Qualidade padrão
+    int quality = 50; // Qualidade padrão
 
     if (argc == 4) {
         quality = atof(argv[3]);

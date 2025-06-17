@@ -45,8 +45,8 @@
     void extract_block_chroma420(PIXELYCBCR *image, float block[8][8], int start_x, int start_y, int width, int height, char channel);
     void reconstructBlock8x8_Y(PIXELYCBCR *dst, float block[8][8], int start_x, int start_y, int width, int height);
     void reconstructBlock8x8_CbCr420(PIXELYCBCR *dst, float block[8][8], int start_x, int start_y, int width, int height, char channel);
-    void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality);
-    void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality);
+    void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int quality);
+    void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int quality);
     void vectorize_macroblocks(MACROBLOCO *macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);
     void devectorize_macroblocks(MACROBLOCO_VETORIZADO *vectorized_macroblocks, MACROBLOCO *macroblocks, int macroblock_count);
     void rle_encode_macroblocks(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, MACROBLOCO_VETORIZADO *vectorized_macroblocks, int macroblock_count);

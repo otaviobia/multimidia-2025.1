@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     
     BITMAPFILEHEADER fhead;
     BITMAPINFOHEADER ihead;
-    float quality_read;
+    int quality_read;
     int count_read;
     MACROBLOCO_RLE_DIFERENCIAL *read_blocks = NULL;
 

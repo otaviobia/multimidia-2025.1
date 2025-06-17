@@ -7,7 +7,7 @@
 
 // Inicializa um buffer de bits
 BitBuffer* init_bit_buffer(size_t initial_capacity) {
-    BitBuffer* buffer = (BitBuffer*)malloc(sizeof(BitBuffer));
+    BitBuffer* buffer = (BitBuffer*)calloc(1, sizeof(BitBuffer));
     if (!buffer) return NULL; // erro em alocar memória
     
     buffer->data = (uint8_t*)calloc(initial_capacity, sizeof(uint8_t));
@@ -574,7 +574,7 @@ int huffman_decode_macroblock(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* des
 }
 
 // Escreve macroblocos comprimidos usando Huffman em um arquivo binário
-void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, float quality) {
+void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, int quality) {
     // Abre o arquivo binário de saída
     FILE *output_file = fopen(output_filename, "wb");
     if (!output_file) {
@@ -586,7 +586,7 @@ void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFER
     writeHeaders(output_file, file_header, info_header);
 
     // Escreve nossos headers
-    fwrite(&quality, sizeof(float), 1, output_file);
+    fwrite(&quality, sizeof(int), 1, output_file);
     fwrite(&macroblock_count, sizeof(int), 1, output_file);
     
     // Para cada macrobloco, codifica usando Huffman e escreve no arquivo
@@ -610,7 +610,7 @@ void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFER
 
 // Lê macroblocos comprimidos usando Huffman de um arquivo binário
 // Salva eles em estruturas MACROBLOCO_RLE_DIFERENCIAL
-int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, float *quality_lida) {
+int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, int *quality_lida) {
     // Abre o arquivo binário de entrada
     FILE *input_file = fopen(input_filename, "rb");
     if (!input_file) {
@@ -621,7 +621,7 @@ int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENC
     // Lê o nosso header do arquivo binário
     readHeader(input_file, fhead);
     readInfoHeader(input_file, ihead);
-    fread(quality_lida, sizeof(float), 1, input_file);
+    fread(quality_lida, sizeof(int), 1, input_file);
     fread(count_lido, sizeof(int), 1, input_file);
 
     // Aloca memória para os macroblocos que serão lidos

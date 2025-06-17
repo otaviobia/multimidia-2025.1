@@ -126,7 +126,7 @@ MACROBLOCO* encodeImageYCbCr(PIXELYCBCR *image, int width, int height, int *out_
     *out_macroblock_count = num_blocks;
 
     // Aloca vetor de macroblocos
-    MACROBLOCO *macroblocks = (MACROBLOCO *) malloc(num_blocks * sizeof(MACROBLOCO));
+    MACROBLOCO *macroblocks = (MACROBLOCO *) calloc(num_blocks, sizeof(MACROBLOCO));
     if (!macroblocks) {
         return NULL;
     }
@@ -249,7 +249,7 @@ void dequantizeMacroblock(MACROBLOCO *mb, int quantization_matrix_y[8][8], int q
     dequantizeBlock(mb->Cr.block, quantization_matrix_chroma);
 }
 
-void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality) {
+void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int quality) {
     /*
      * Aplica a quantização em um vetor de macroblocos.
      *
@@ -259,15 +259,15 @@ void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quali
      * compression_factor: fator de compressão
      */
     int quantization_matrix_y[8][8], quantization_matrix_chroma[8][8];
-    float multiplier = quality < 50 ? 5000/quality : (200 - 2*quality);
+    int scale_factor = quality < 50 ? 5000 / quality : 200 - quality*2;
 
     // Preenche as matrizes de quantização com os valores base multiplicados pelo fator de compressão
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            quantization_matrix_y[i][j] = (int)floor((base_quantization_matrix_y[i][j] * multiplier + 50) / 100);
-            if (quantization_matrix_y[i][j] == 0) quantization_matrix_y[i][j] = 1; // Garante que não seja zero
-            quantization_matrix_chroma[i][j] = (int)floor((base_quantization_matrix_chroma[i][j] * multiplier + 50) / 100);
-            if (quantization_matrix_chroma[i][j] == 0) quantization_matrix_chroma[i][j] = 1; // Garante que não seja zero
+            quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * scale_factor + 50) / 100;
+            if (quantization_matrix_y[i][j] <= 0) quantization_matrix_y[i][j] = 1; // Garante que não seja zero
+            quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * scale_factor + 50) / 100;
+            if (quantization_matrix_chroma[i][j] <= 0) quantization_matrix_chroma[i][j] = 1; // Garante que não seja zero
         }
     }
 
@@ -275,7 +275,7 @@ void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quali
         quantizeMacroblock(&mb_array[i], quantization_matrix_y, quantization_matrix_chroma);
     }
 }
-void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality) {
+void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int quality) {
     /*
      * Aplica a dequantização em um vetor de macroblocos.
      *
@@ -285,15 +285,15 @@ void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float qua
      * compression_factor: fator de compressão
      */
     int quantization_matrix_y[8][8], quantization_matrix_chroma[8][8];
-    float multiplier = quality < 50 ? 5000/quality : (200 - 2*quality);
+    int scale_factor = quality < 50 ? 5000 / quality : 200 - quality*2;
 
     // Preenche as matrizes de quantização com os valores base multiplicados pelo fator de compressão
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            quantization_matrix_y[i][j] = (int)floor((base_quantization_matrix_y[i][j] * multiplier + 50) / 100);
-            if (quantization_matrix_y[i][j] == 0) quantization_matrix_y[i][j] = 1; // Garante que não seja zero
-            quantization_matrix_chroma[i][j] = (int)floor((base_quantization_matrix_chroma[i][j] * multiplier + 50) / 100);
-            if (quantization_matrix_chroma[i][j] == 0) quantization_matrix_chroma[i][j] = 1; // Garante que não seja zero
+            quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * scale_factor + 50) / 100;
+            if (quantization_matrix_y[i][j] <= 0) quantization_matrix_y[i][j] = 1; // Garante que não seja zero
+            quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * scale_factor + 50) / 100;
+            if (quantization_matrix_chroma[i][j] <= 0) quantization_matrix_chroma[i][j] = 1; // Garante que não seja zero
         }
     }
 

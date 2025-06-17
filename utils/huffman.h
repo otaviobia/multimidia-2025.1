@@ -13,7 +13,7 @@
     typedef struct {
         BITMAPFILEHEADER file_header;
         BITMAPINFOHEADER info_header;
-        float quality;
+        int quality;
         int macroblock_count;
     } COMPRESSED_HEADER;
 
@@ -60,8 +60,8 @@
     int huffman_decode_macroblock(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* dest_macroblock);
 
     // Funções de leitura e escrita de macroblocos
-    void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, float quality);
-    int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, float *quality_lida);    // Tabela DC - Fornecida (expandida com categorias 11 e 12)
+    void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, int quality);
+    int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, int *quality_lida);    // Tabela DC - Fornecida (expandida com categorias 11 e 12)
     static const HuffmanEntry JPEG_DC_LUMINANCE_TABLE[13] = {
         // binario  | comprimento | valor(binario em hexadecimal)
         // Qtd. bits da mantissa é o mesmo da categoria
@@ -296,4 +296,5 @@
         {"1111111111111110", 16, 0xFFFE}, // (F,A)
     }
     };
+
 #endif
