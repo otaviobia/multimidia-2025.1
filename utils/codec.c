@@ -533,24 +533,26 @@ void differential_encode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
     /*
      * Faz codificação diferencial dos coeficientes DC dos macroblocos.
      */
-    int previous_dc_Y[4] = {0}, previous_dc_Cb = 0, previous_dc_Cr = 0;
+    int previous_dc_Y = 0;
+    int previous_dc_Cb = 0;
+    int previous_dc_Cr = 0;
 
     for (int i = 0; i < macroblock_count; i++) {
+        // Processa os 4 blocos Y em sequência
         for (int j = 0; j < 4; j++) {
-            int current = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
-            int diff = current - previous_dc_Y[j];
-            rle_macroblocks[i].Y_vetor[j].coeficiente_dc = diff;
-            previous_dc_Y[j] = current;
+            int current_dc = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
+            rle_macroblocks[i].Y_vetor[j].coeficiente_dc = current_dc - previous_dc_Y;
+            previous_dc_Y = current_dc; // O preditor para o próximo Y é o Y atual
         }
 
+        // Processa o bloco Cb
         int current_Cb = rle_macroblocks[i].Cb_vetor.coeficiente_dc;
-        int diff_Cb = current_Cb - previous_dc_Cb;
-        rle_macroblocks[i].Cb_vetor.coeficiente_dc = diff_Cb;
+        rle_macroblocks[i].Cb_vetor.coeficiente_dc = current_Cb - previous_dc_Cb;
         previous_dc_Cb = current_Cb;
 
+        // Processa o bloco Cr
         int current_Cr = rle_macroblocks[i].Cr_vetor.coeficiente_dc;
-        int diff_Cr = current_Cr - previous_dc_Cr;
-        rle_macroblocks[i].Cr_vetor.coeficiente_dc = diff_Cr;
+        rle_macroblocks[i].Cr_vetor.coeficiente_dc = current_Cr - previous_dc_Cr;
         previous_dc_Cr = current_Cr;
     }
 }
@@ -559,21 +561,26 @@ void differential_decode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
     /*
      * Faz decodificação diferencial dos coeficientes DC dos macroblocos.
      */
-    int previous_dc_Y[4] = {0}, previous_dc_Cb = 0, previous_dc_Cr = 0;
+    int previous_dc_Y = 0;
+    int previous_dc_Cb = 0;
+    int previous_dc_Cr = 0;
 
     for (int i = 0; i < macroblock_count; i++) {
+        // Decodifica os 4 blocos Y
         for (int j = 0; j < 4; j++) {
             int diff = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
-            int real_dc = previous_dc_Y[j] + diff;
+            int real_dc = previous_dc_Y + diff;
             rle_macroblocks[i].Y_vetor[j].coeficiente_dc = real_dc;
-            previous_dc_Y[j] = real_dc;
+            previous_dc_Y = real_dc; // O preditor para o próximo Y é o Y reconstruído
         }
 
+        // Decodifica o bloco Cb
         int diff_Cb = rle_macroblocks[i].Cb_vetor.coeficiente_dc;
         int real_Cb = previous_dc_Cb + diff_Cb;
         rle_macroblocks[i].Cb_vetor.coeficiente_dc = real_Cb;
         previous_dc_Cb = real_Cb;
 
+        // Decodifica o bloco Cr
         int diff_Cr = rle_macroblocks[i].Cr_vetor.coeficiente_dc;
         int real_Cr = previous_dc_Cr + diff_Cr;
         rle_macroblocks[i].Cr_vetor.coeficiente_dc = real_Cr;
