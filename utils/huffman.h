@@ -61,10 +61,8 @@
 
     // Funções de leitura e escrita de macroblocos
     void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, float quality);
-    int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, float *quality_lida);
-    
-    // Tabela DC - Fornecida
-    static const HuffmanEntry JPEG_DC_LUMINANCE_TABLE[11] = {
+    int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, float *quality_lida);    // Tabela DC - Fornecida (expandida com categorias 11 e 12)
+    static const HuffmanEntry JPEG_DC_LUMINANCE_TABLE[13] = {
         // binario  | comprimento | valor(binario em hexadecimal)
         // Qtd. bits da mantissa é o mesmo da categoria
         // (linha) - (categoria)
@@ -79,7 +77,9 @@
         {"11110", 5, 0x1E},       // Categoria 7
         {"111110", 6, 0x3E},      // Categoria 8
         {"1111110", 7, 0x7E},     // Categoria 9
-        {"11111110", 8, 0xFE}     // Categoria A
+        {"11111110", 8, 0xFE},    // Categoria A (10)
+        {"111111110", 9, 0x1FE},  // Categoria B (11)
+        {"1111111110", 10, 0x3FE} // Categoria C (12)
     };
     
     // Tabela AC - Fornecida

@@ -115,9 +115,21 @@ int write_bits(BitBuffer* buffer, int value, int num_bits) {
 
 // Escreve um coeficiente DC no buffer
 int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
+    // Clamp DC value to category 12 range if it exceeds it
+    int original_dc = dc_diff;
+    if (dc_diff > 4095) {
+        dc_diff = 4095;
+    } else if (dc_diff < -4095) {
+        dc_diff = -4095;
+    }
+    
     // Determina a categoria do coeficiente
     int category = get_coefficient_category(dc_diff);
-    if (category > 10) category = 10;  // Limita a tabela disponível
+    
+    // Debug: verifica se a categoria está dentro dos limites
+    if (category > 12) {
+        return 0;  // Erro crítico
+    }
     
     // Obtém o código Huffman para esta categoria
     const HuffmanEntry* entry = &JPEG_DC_LUMINANCE_TABLE[category];
@@ -168,11 +180,24 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
             return 0;
         }
         run_length -= 16;
+    }    // Clamp AC value to prevent excessive categories
+    int original_ac = ac_value;
+    if (ac_value > 1023) {
+        ac_value = 1023;  // Max for category 10
+    } else if (ac_value < -1023) {
+        ac_value = -1023;  // Min for category 10
     }
     
     // Categoria do valor AC
     int category = get_coefficient_category(ac_value);
-    if (category > 10) category = 10;  // Limita a tabela disponível
+    if (category > 10) {
+        category = 10;  // Limita a tabela disponível
+    }
+    
+    // Verifica se run_length está dentro dos limites da tabela
+    if (run_length > 15) {
+        return 0;
+    }
     
     // Obtem o código Huffman para o par (run, category)
     const HuffmanEntry* entry = &JPEG_AC_LUMINANCE_MATRIX[run_length][category];
@@ -184,6 +209,7 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
     
     // Escreve o prefixo Huffman para o par (run, category)
     if (!write_bits(buffer, entry->code_value, entry->code_length)) {
+        printf("Erro ao escrever prefixo Huffman AC (run=%d, cat=%d)\n", run_length, category);
         return 0;
     }
     
@@ -192,6 +218,7 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
     
     // Escreve o valor codificado
     if (!write_bits(buffer, encoded_value, category)) {
+        printf("Erro ao escrever valor AC codificado %d (categoria %d)\n", encoded_value, category);
         return 0;
     }
     
@@ -202,6 +229,7 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
 int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     // Codifica o coeficiente DC
     if (!write_dc_coefficient(buffer, block->coeficiente_dc)) {
+        printf("Erro ao codificar DC: %d\n", block->coeficiente_dc);
         return 0;
     }
     
@@ -343,7 +371,7 @@ int decode_dc_huffman(BitBuffer* buffer) {
         bits_read++;
         
         // Verifica se este código corresponde a uma categoria DC
-        for (int i = 0; i <= 10; i++) {
+        for (int i = 0; i <= 12; i++) {
             const HuffmanEntry* entry = &JPEG_DC_LUMINANCE_TABLE[i];
             if (entry->code_length == bits_read && 
                 entry->code_value == current_code) {
