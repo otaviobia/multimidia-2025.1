@@ -48,6 +48,11 @@ int main(int argc, char *argv[]) {
     // 2. Lê os pixels RGB do arquivo BMP
     int width = info_header.Width;
     int height = info_header.Height;
+    if (width % 8 != 0 || height % 8 != 0) {
+        printf("Erro: Dimensões da imagem devem ser múltiplas de 8.\n");
+        fclose(input_file);
+        return 1;
+    }
     int tam = width * height;
     PIXELRGB *pixels_rgb = (PIXELRGB *)calloc(tam, sizeof(PIXELRGB));
     if (!pixels_rgb) {
