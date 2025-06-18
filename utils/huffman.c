@@ -1,12 +1,13 @@
 #include "huffman.h"
 #include "codec.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
 
 // Inicializa um buffer de bits
 BitBuffer* init_bit_buffer(size_t initial_capacity) {
-    BitBuffer* buffer = (BitBuffer*)malloc(sizeof(BitBuffer));
+    BitBuffer* buffer = (BitBuffer*)calloc(1, sizeof(BitBuffer));
     if (!buffer) return NULL; // erro em alocar memória
     
     buffer->data = (uint8_t*)calloc(initial_capacity, sizeof(uint8_t));
@@ -114,15 +115,31 @@ int write_bits(BitBuffer* buffer, int value, int num_bits) {
 
 // Escreve um coeficiente DC no buffer
 int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
+    // Clamp DC value to category 12 range if it exceeds it
+    int original_dc = dc_diff;
+    if (dc_diff > 4095) {
+        dc_diff = 4095;
+        printf("AVISO: DC coeficiente %d clamped para %d (limite categoria 12)\n", original_dc, dc_diff);
+    } else if (dc_diff < -4095) {
+        dc_diff = -4095;
+        printf("AVISO: DC coeficiente %d clamped para %d (limite categoria 12)\n", original_dc, dc_diff);
+    }
+    
     // Determina a categoria do coeficiente
     int category = get_coefficient_category(dc_diff);
-    if (category > 10) category = 10;  // Limita a tabela disponível
+    
+    // Debug: verifica se a categoria está dentro dos limites
+    if (category > 12) {
+        printf("ERRO: DC coeficiente %d ainda excede categoria 12 após clamp (categoria calculada: %d)\n", dc_diff, category);
+        return 0;  // Erro crítico
+    }
     
     // Obtém o código Huffman para esta categoria
     const HuffmanEntry* entry = &JPEG_DC_LUMINANCE_TABLE[category];
     
     // Escreve o prefixo Huffman para a categoria
     if (!write_bits(buffer, entry->code_value, entry->code_length)) {
+        printf("Erro ao escrever prefixo Huffman para DC categoria %d\n", category);
         return 0;
     }
     
@@ -133,6 +150,7 @@ int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
         
         // Escreve o valor codificado
         if (!write_bits(buffer, encoded_value, category)) { // Retorna 0 se falhar
+            printf("Erro ao escrever valor codificado %d para DC categoria %d\n", encoded_value, category);
             return 0;
         }
     }
@@ -145,17 +163,26 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
     // EOB - End of Block (0,0)
     if (run_length == 0 && ac_value == 0) {
         const HuffmanEntry* entry = &JPEG_AC_LUMINANCE_MATRIX[0][0];
-        return write_bits(buffer, entry->code_value, entry->code_length);
+        if (!write_bits(buffer, entry->code_value, entry->code_length)) {
+            printf("Erro ao escrever EOB\n");
+            return 0;
+        }
+        return 1;
     }
     
     // ZRL - Zero Run Length (15,0)
     if (run_length == 15 && ac_value == 0) {
         const HuffmanEntry* zrl = &JPEG_AC_LUMINANCE_MATRIX[15][0];
-        return write_bits(buffer, zrl->code_value, zrl->code_length);
+        if (!write_bits(buffer, zrl->code_value, zrl->code_length)) {
+            printf("Erro ao escrever ZRL\n");
+            return 0;
+        }
+        return 1;
     }
     
     // Se o ac_value é zero, mas não é EOB ou ZRL, é um erro/n existe na tabela fornecida
     if (ac_value == 0) {
+        printf("Erro: Combinação inválida em JPEG RLE - run_length=%d, ac_value=0\n", run_length);
         return 0;  // Combinação inválida em JPEG RLE
     }
     
@@ -164,25 +191,56 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
         // ZRL - Zero Run Length (15,0)
         const HuffmanEntry* zrl = &JPEG_AC_LUMINANCE_MATRIX[15][0];
         if (!write_bits(buffer, zrl->code_value, zrl->code_length)) {
+            printf("Erro ao escrever ZRL durante run_length > 15\n");
             return 0;
         }
         run_length -= 16;
+    }    // Clamp AC value to prevent excessive categories
+    int original_ac = ac_value;
+    if (ac_value > 1023) {
+        ac_value = 1023;  // Max for category 10
+        printf("AVISO: AC coeficiente %d clamped para %d (limite categoria 10)\n", original_ac, ac_value);
+    } else if (ac_value < -1023) {
+        ac_value = -1023;  // Min for category 10
+        printf("AVISO: AC coeficiente %d clamped para %d (limite categoria 10)\n", original_ac, ac_value);
     }
     
     // Categoria do valor AC
     int category = get_coefficient_category(ac_value);
-    if (category > 10) category = 10;  // Limita a tabela disponível
+    if (category > 10) {
+        printf("AVISO: AC coeficiente %d excede categoria 10 (categoria calculada: %d). Limitando.\n", ac_value, category);
+        category = 10;  // Limita a tabela disponível
+    }
+    
+    // Verifica se run_length está dentro dos limites da tabela
+    if (run_length > 15) {
+        printf("Erro: run_length %d excede limite da tabela AC (máximo 15)\n", run_length);
+        return 0;
+    }
     
     // Obtem o código Huffman para o par (run, category)
     const HuffmanEntry* entry = &JPEG_AC_LUMINANCE_MATRIX[run_length][category];
     
     // Verifica se este par tem entrada na tabela
     if (entry->code_length == 0) {
-        return 0;  // Combinação inválida
+        // Se categoria 11 não tem entrada para este run_length, tenta categoria 10
+        if (category == 11) {
+            printf("AVISO: Entrada AC (run=%d, cat=11) não disponível. Usando categoria 10 para AC valor %d.\n", run_length, ac_value);
+            category = 10;
+            entry = &JPEG_AC_LUMINANCE_MATRIX[run_length][category];
+            if (entry->code_length == 0) {
+                printf("Erro: Combinação inválida na tabela AC - run_length=%d, category=%d\n", run_length, category);
+                return 0;  // Combinação inválida
+            }
+        } else {
+            printf("Erro: Combinação inválida na tabela AC - run_length=%d, category=%d\n", run_length, category);
+            return 0;  // Combinação inválida
+        }
     }
     
     // Escreve o prefixo Huffman para o par (run, category)
     if (!write_bits(buffer, entry->code_value, entry->code_length)) {
+        printf("Erro ao escrever prefixo Huffman AC (run=%d, cat=%d)\n", run_length, category);
         return 0;
     }
     
@@ -191,6 +249,7 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
     
     // Escreve o valor codificado
     if (!write_bits(buffer, encoded_value, category)) {
+        printf("Erro ao escrever valor AC codificado %d (categoria %d)\n", encoded_value, category);
         return 0;
     }
     
@@ -201,21 +260,27 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
 int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     // Codifica o coeficiente DC
     if (!write_dc_coefficient(buffer, block->coeficiente_dc)) {
+        printf("Erro ao codificar DC: %d\n", block->coeficiente_dc);
         return 0;
     }
     
     // Codifica os pares AC (zeros, valor)
     for (int i = 0; i < block->quantidade; i++) {
         int zeros = block->pares[i].zeros;
-        int valor = (int)round(block->pares[i].valor);
+        int valor = block->pares[i].valor;
         
         // Se temos o par (0,0), é um EOB
-        if (block->pares[i].zeros == 0 && block->pares[i].valor == 0.0f) {
-            return write_ac_coefficient(buffer, 0, 0);
+        if (block->pares[i].zeros == 0 && block->pares[i].valor == 0) {
+            if (!write_ac_coefficient(buffer, 0, 0)) {
+                printf("Erro ao codificar EOB\n");
+                return 0;
+            }
+            return 1;
         }
         
         // Codifica o par AC
         if (!write_ac_coefficient(buffer, zeros, valor)) {
+            printf("Erro ao codificar AC[%d]: zeros=%d, valor=%d\n", i, zeros, valor);
             return 0;
         }
     }
@@ -223,8 +288,11 @@ int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     // Se não terminou com EOB explícito, adiciona um
     if (block->quantidade == 0 || 
         !(block->pares[block->quantidade-1].zeros == 0 && 
-          block->pares[block->quantidade-1].valor == 0.0f)) {
-        return write_ac_coefficient(buffer, 0, 0);
+          block->pares[block->quantidade-1].valor == 0)) {
+        if (!write_ac_coefficient(buffer, 0, 0)) {
+            printf("Erro ao adicionar EOB final\n");
+            return 0;
+        }
     }
     
     return 1;
@@ -239,6 +307,7 @@ BitBuffer* huffman_encode_macroblock(MACROBLOCO_RLE_DIFERENCIAL* macroblock) {
     // Codifica os blocos Y (luminância)
     for (int i = 0; i < 4; i++) {
         if (!huffman_encode_block(buffer, &macroblock->Y_vetor[i])) {
+            printf("Erro ao codificar bloco Y[%d]. DC: %d\n", i, macroblock->Y_vetor[i].coeficiente_dc);
             free_bit_buffer(buffer);
             return NULL;
         }
@@ -246,12 +315,14 @@ BitBuffer* huffman_encode_macroblock(MACROBLOCO_RLE_DIFERENCIAL* macroblock) {
     
     // Codifica o bloco Cb (crominância azul)
     if (!huffman_encode_block(buffer, &macroblock->Cb_vetor)) {
+        printf("Erro ao codificar bloco Cb. DC: %d\n", macroblock->Cb_vetor.coeficiente_dc);
         free_bit_buffer(buffer);
         return NULL;
     }
     
     // Codifica o bloco Cr (crominância vermelha)
     if (!huffman_encode_block(buffer, &macroblock->Cr_vetor)) {
+        printf("Erro ao codificar bloco Cr. DC: %d\n", macroblock->Cr_vetor.coeficiente_dc);
         free_bit_buffer(buffer);
         return NULL;
     }
@@ -342,7 +413,7 @@ int decode_dc_huffman(BitBuffer* buffer) {
         bits_read++;
         
         // Verifica se este código corresponde a uma categoria DC
-        for (int i = 0; i <= 10; i++) {
+        for (int i = 0; i <= 12; i++) {
             const HuffmanEntry* entry = &JPEG_DC_LUMINANCE_TABLE[i];
             if (entry->code_length == bits_read && 
                 entry->code_value == current_code) {
@@ -352,23 +423,6 @@ int decode_dc_huffman(BitBuffer* buffer) {
     }
     
     return -1; // Código inválido - não encontrou nas tabelas ou excedeu comprimento máximo
-}
-
-// Decodifica um coeficiente DC
-int decode_dc_coefficient(BitBuffer* buffer) {
-    // Decodifica o símbolo Huffman para obter a categoria
-    int category = decode_dc_huffman(buffer);
-    if (category < 0) return -1; // Erro
-    
-    // Se for categoria 0, o valor é 0
-    if (category == 0) return 0;
-    
-    // Lê os bits adicionais que representam o valor
-    int additional_bits = read_bits(buffer, category);
-    if (additional_bits < 0) return -1; // Erro
-    
-    // Converte o código para o valor real
-    return decode_coefficient_from_category(category, additional_bits);
 }
 
 // Decodifica um par AC (run, category)
@@ -411,6 +465,27 @@ int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category) {
     return 0; // Não encontrou
 }
 
+// Decodifica um coeficiente DC (o resultado pode ser negativo)
+int decode_dc_coefficient(int* result_val, BitBuffer* buffer) {
+    // Decodifica o símbolo Huffman para obter a categoria
+    int category = decode_dc_huffman(buffer);
+    if (category < 0) return 0; // Erro
+
+    // Se for categoria 0, o valor é 0
+    if (category == 0) {
+        *result_val = 0;
+        return 1; // Sucesso
+    }
+
+    // Lê os bits adicionais que representam o valor
+    int additional_bits = read_bits(buffer, category);
+    if (additional_bits < 0) return 0; // Erro
+
+    // Converte o código para o valor real
+    *result_val = decode_coefficient_from_category(category, additional_bits);
+    return 1; // Sucesso
+}
+
 // Decodifica um coeficiente AC
 int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value) {
     int category;
@@ -446,10 +521,9 @@ int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value) {
 
 // Decodifica um bloco inteiro
 int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
-    // Decodifica o coeficiente DC
-    int dc = decode_dc_coefficient(buffer);
-    if (dc < 0) return 0;
-    
+    int dc;
+    if (!decode_dc_coefficient(&dc, buffer)) return 0;
+
     block->coeficiente_dc = dc;
     block->quantidade = 0;
     
@@ -458,12 +532,19 @@ int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     while (pos < 63) { // Máximo de 63 coeficientes AC
         int run_length, value;
         int result = decode_ac_coefficient(buffer, &run_length, &value);
-        
-        if (result == 0) return 0; // Erro
-        if (result == 2) break; // EOB
-        
-        // Para ZRL, apenas avançamos a posição
+          if (result == 0) return 0; // Erro
+        if (result == 2) {
+            // EOB encontrado - adiciona o marcador [0,0] ao bloco antes de sair
+            block->pares[block->quantidade].zeros = 0;
+            block->pares[block->quantidade].valor = 0;
+            block->quantidade++;
+            break;
+        }
+          // Para ZRL, adiciona o marcador [15,0] ao bloco e avança a posição
         if (result == 3) {
+            block->pares[block->quantidade].zeros = 15;
+            block->pares[block->quantidade].valor = 0;
+            block->quantidade++;
             pos += 16;
             continue;
         }
@@ -474,7 +555,7 @@ int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
         
         // Adiciona o par (run_length, value) ao bloco
         block->pares[block->quantidade].zeros = run_length;
-        block->pares[block->quantidade].valor = (float)value;
+        block->pares[block->quantidade].valor = value;
         block->quantidade++;
     }
     
@@ -482,29 +563,107 @@ int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
 }
 
 // Decodifica um macrobloco completo
-MACROBLOCO_RLE_DIFERENCIAL* huffman_decode_macroblock(BitBuffer* buffer) {
-    MACROBLOCO_RLE_DIFERENCIAL* macroblock = malloc(sizeof(MACROBLOCO_RLE_DIFERENCIAL));
-    if (!macroblock) return NULL;
+int huffman_decode_macroblock(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* dest_macroblock) {
+    if (!dest_macroblock) return 0;
     
     // Decodifica os blocos Y (luminância)
     for (int i = 0; i < 4; i++) {
-        if (!huffman_decode_block(buffer, &macroblock->Y_vetor[i])) {
-            free(macroblock);
-            return NULL;
-        }
+        if (!huffman_decode_block(buffer, &dest_macroblock->Y_vetor[i])) return 0;
     }
     
     // Decodifica o bloco Cb (crominância azul)
-    if (!huffman_decode_block(buffer, &macroblock->Cb_vetor)) {
-        free(macroblock);
-        return NULL;
-    }
+    if (!huffman_decode_block(buffer, &dest_macroblock->Cb_vetor)) return 0;
     
     // Decodifica o bloco Cr (crominância vermelha)
-    if (!huffman_decode_block(buffer, &macroblock->Cr_vetor)) {
-        free(macroblock);
-        return NULL;
-    }
+    if (!huffman_decode_block(buffer, &dest_macroblock->Cr_vetor)) return 0;
     
-    return macroblock;
+    return 1;
+}
+
+// Escreve macroblocos comprimidos usando Huffman em um arquivo binário
+void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, int quality) {
+    // Abre o arquivo binário de saída
+    FILE *output_file = fopen(output_filename, "wb");
+    if (!output_file) {
+        printf("Erro ao abrir o arquivo %s para escrita", output_filename);
+        return;
+    }
+
+    // Escreve os headers do BMP
+    writeHeaders(output_file, file_header, info_header);
+
+    // Escreve nossos headers
+    fwrite(&quality, sizeof(int), 1, output_file);
+    fwrite(&macroblock_count, sizeof(int), 1, output_file);
+    
+    // Para cada macrobloco, codifica usando Huffman e escreve no arquivo
+    for (int i = 0; i < macroblock_count; i++) {
+        BitBuffer *buffer = huffman_encode_macroblock(&rle_macroblocks[i]);
+        if (!buffer) {
+            printf("Erro ao codificar macrobloco %d com huffman.\n", i);
+            continue;
+        }
+
+        size_t buffer_size = get_huffman_buffer_size(buffer);
+
+        fwrite(&buffer_size, sizeof(size_t), 1, output_file); // Escreve o tamanho do buffer
+        fwrite(buffer->data, sizeof(uint8_t), buffer_size, output_file); // Escreve os dados comprimidos
+        
+        free_bit_buffer(buffer); // Libera o buffer após escrever
+    }
+
+    fclose(output_file);
+}
+
+// Lê macroblocos comprimidos usando Huffman de um arquivo binário
+// Salva eles em estruturas MACROBLOCO_RLE_DIFERENCIAL
+int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, int *quality_lida) {
+    // Abre o arquivo binário de entrada
+    FILE *input_file = fopen(input_filename, "rb");
+    if (!input_file) {
+        printf("Erro ao abrir o arquivo %s para leitura.\n", input_filename);
+        return 0;
+    }
+
+    // Lê o nosso header do arquivo binário
+    readHeader(input_file, fhead);
+    readInfoHeader(input_file, ihead);
+    fread(quality_lida, sizeof(int), 1, input_file);
+    fread(count_lido, sizeof(int), 1, input_file);
+
+    // Aloca memória para os macroblocos que serão lidos
+    *blocos_lidos = (MACROBLOCO_RLE_DIFERENCIAL *)calloc((*count_lido), sizeof(MACROBLOCO_RLE_DIFERENCIAL));
+    if (!*blocos_lidos) {
+        printf("Erro ao alocar memória para os macroblocos.\n");
+        fclose(input_file);
+        return 0;
+    }
+
+    // Lê e decodifica (huffman) todos os macroblocos
+    for (int i = 0; i < (*count_lido); i++) { // para cada macrobloco
+        size_t buffer_size;
+        if (fread(&buffer_size, sizeof(size_t), 1, input_file) != 1) {
+            printf("Erro fatal: Não foi possível ler o tamanho do macrobloco %d.\n", i);
+            free(*blocos_lidos);
+            fclose(input_file);
+            return 0;
+        }
+
+        BitBuffer *buffer = init_bit_buffer(buffer_size);
+        if (fread(buffer->data, 1, buffer_size, input_file) != buffer_size) {
+            printf("Erro fatal: Não foi possível ler %d bytes de dados do macrobloco %llu.\n", i, (unsigned long long)buffer_size);
+            free_bit_buffer(buffer);
+            free(*blocos_lidos);
+            fclose(input_file);
+            return 0;
+        }
+
+        if (!huffman_decode_macroblock(buffer, &((*blocos_lidos)[i]))) {
+            printf("Erro: Falha ao decodificar o Huffman do macrobloco %d.\n", i);
+        }
+        free_bit_buffer(buffer);
+    }
+
+    fclose(input_file);
+    return 1;
 }

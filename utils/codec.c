@@ -126,7 +126,7 @@ MACROBLOCO* encodeImageYCbCr(PIXELYCBCR *image, int width, int height, int *out_
     *out_macroblock_count = num_blocks;
 
     // Aloca vetor de macroblocos
-    MACROBLOCO *macroblocks = (MACROBLOCO *) malloc(num_blocks * sizeof(MACROBLOCO));
+    MACROBLOCO *macroblocks = (MACROBLOCO *) calloc(num_blocks, sizeof(MACROBLOCO));
     if (!macroblocks) {
         return NULL;
     }
@@ -161,7 +161,7 @@ MACROBLOCO* encodeImageYCbCr(PIXELYCBCR *image, int width, int height, int *out_
     return macroblocks;
 }
 
-float base_quantization_matrix_y[8][8] = {
+int base_quantization_matrix_y[8][8] = {
     {16, 11, 10, 16, 24, 40, 51, 61},
     {12, 12, 14, 19, 26, 58, 60, 55},
     {14, 13, 16, 24, 40, 57, 69, 56},
@@ -172,7 +172,7 @@ float base_quantization_matrix_y[8][8] = {
     {72,92 ,95 ,98 ,112 ,100 ,103 ,99}
 };
 
-float base_quantization_matrix_chroma[8][8] = {
+int base_quantization_matrix_chroma[8][8] = {
     {17, 18, 24, 47, 99, 99, 99, 99},
     {18, 21, 26, 66, 99, 99, 99, 99},
     {24, 26, 56, 99, 99, 99, 99, 99},
@@ -183,7 +183,7 @@ float base_quantization_matrix_chroma[8][8] = {
     {99 ,99 ,99 ,99 ,99 ,99 ,99 ,98}
 };
 
-void quantizeBlock(float block[8][8], float quantization_matrix[8][8]) {
+void quantizeBlock(float block[8][8], int quantization_matrix[8][8]) {
     /*
      * Aplica a quantização em um bloco 8x8 usando uma matriz de quantização.
      *
@@ -200,7 +200,7 @@ void quantizeBlock(float block[8][8], float quantization_matrix[8][8]) {
     }
 }
 
-void dequantizeBlock(float block[8][8], float quantization_matrix[8][8]) {
+void dequantizeBlock(float block[8][8], int quantization_matrix[8][8]) {
     /*
      * Aplica a dequantização em um bloco 8x8 usando uma matriz de quantização.
      *
@@ -211,13 +211,13 @@ void dequantizeBlock(float block[8][8], float quantization_matrix[8][8]) {
      */
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
-            // Aplica a dequantização
-            block[y][x] *= quantization_matrix[y][x];
+            // Aplica a dequantização com arredondamento para melhor precisão
+            block[y][x] = roundf(block[y][x] * quantization_matrix[y][x]);
         }
     }
 }
 
-void quantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], float quantization_matrix_chroma[8][8]) {
+void quantizeMacroblock(MACROBLOCO *mb, int quantization_matrix_y[8][8], int quantization_matrix_chroma[8][8]) {
     /*
      * Aplica a quantização em um macrobloco 16x16.
      *
@@ -233,7 +233,7 @@ void quantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], float
     quantizeBlock(mb->Cr.block, quantization_matrix_chroma);
 }
 
-void dequantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], float quantization_matrix_chroma[8][8]) {
+void dequantizeMacroblock(MACROBLOCO *mb, int quantization_matrix_y[8][8], int quantization_matrix_chroma[8][8]) {
     /*
      * Aplica a dequantização em um macrobloco 16x16.
      *
@@ -249,7 +249,7 @@ void dequantizeMacroblock(MACROBLOCO *mb, float quantization_matrix_y[8][8], flo
     dequantizeBlock(mb->Cr.block, quantization_matrix_chroma);
 }
 
-void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality) {
+void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int quality) {
     /*
      * Aplica a quantização em um vetor de macroblocos.
      *
@@ -258,14 +258,16 @@ void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quali
      * macroblock_count: número de macroblocos
      * compression_factor: fator de compressão
      */
-    float quantization_matrix_y[8][8], quantization_matrix_chroma[8][8], multiplier;
-    multiplier = quality < 50 ? 5000/quality : (200 - 2*quality);
+    int quantization_matrix_y[8][8], quantization_matrix_chroma[8][8];
+    int scale_factor = quality < 50 ? (int)round(5000.0 / quality) : 200 - quality*2;
 
     // Preenche as matrizes de quantização com os valores base multiplicados pelo fator de compressão
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * multiplier + 50) / 100;
-            quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * multiplier + 50) / 100;
+            quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * scale_factor + 50) / 100;
+            if (quantization_matrix_y[i][j] <= 0) quantization_matrix_y[i][j] = 1; // Garante que não seja zero
+            quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * scale_factor + 50) / 100;
+            if (quantization_matrix_chroma[i][j] <= 0) quantization_matrix_chroma[i][j] = 1; // Garante que não seja zero
         }
     }
 
@@ -273,7 +275,7 @@ void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quali
         quantizeMacroblock(&mb_array[i], quantization_matrix_y, quantization_matrix_chroma);
     }
 }
-void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float quality) {
+void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int quality) {
     /*
      * Aplica a dequantização em um vetor de macroblocos.
      *
@@ -282,14 +284,16 @@ void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, float qua
      * macroblock_count: número de macroblocos
      * compression_factor: fator de compressão
      */
-    float quantization_matrix_y[8][8], quantization_matrix_chroma[8][8], multiplier;
-    multiplier = quality < 50 ? 5000/quality : (200 - 2*quality);
+    int quantization_matrix_y[8][8], quantization_matrix_chroma[8][8];
+    int scale_factor = quality < 50 ? (int)round(5000.0 / quality) : 200 - quality*2;
 
     // Preenche as matrizes de quantização com os valores base multiplicados pelo fator de compressão
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
-            quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * multiplier + 50) / 100;
-            quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * multiplier + 50) / 100;
+            quantization_matrix_y[i][j] = (base_quantization_matrix_y[i][j] * scale_factor + 50) / 100;
+            if (quantization_matrix_y[i][j] <= 0) quantization_matrix_y[i][j] = 1; // Garante que não seja zero
+            quantization_matrix_chroma[i][j] = (base_quantization_matrix_chroma[i][j] * scale_factor + 50) / 100;
+            if (quantization_matrix_chroma[i][j] <= 0) quantization_matrix_chroma[i][j] = 1; // Garante que não seja zero
         }
     }
 
@@ -427,15 +431,16 @@ void rle_encode_block(BLOCO_RLE_DIFERENCIAL* rle_block, VETORZIGZAG* zigzag_bloc
     rle_block->quantidade = 0;
     int quantidade_zeros = 0;
 
-    rle_block->coeficiente_dc = zigzag_block->vector[0];
+    rle_block->coeficiente_dc = (int)round(zigzag_block->vector[0]);
 
     for (int i = 1; i <= 63; i++) {
-        if (fabs(zigzag_block->vector[i]) < 0.0001f) {
+        int valor_quantizado = (int)round(zigzag_block->vector[i]);
+        if (valor_quantizado == 0) {
             quantidade_zeros++;
         } else {
             if (rle_block->quantidade < 63) {
                  rle_block->pares[rle_block->quantidade].zeros = quantidade_zeros;
-                 rle_block->pares[rle_block->quantidade].valor = zigzag_block->vector[i];
+                 rle_block->pares[rle_block->quantidade].valor = valor_quantizado;
                  rle_block->quantidade++;
                  quantidade_zeros = 0;
             } else {
@@ -446,7 +451,7 @@ void rle_encode_block(BLOCO_RLE_DIFERENCIAL* rle_block, VETORZIGZAG* zigzag_bloc
     // Colocar EOB
     if (rle_block->quantidade < 64) {
         rle_block->pares[rle_block->quantidade].zeros = 0;
-        rle_block->pares[rle_block->quantidade].valor = 0.0f;
+        rle_block->pares[rle_block->quantidade].valor = 0;
         rle_block->quantidade++;
     }
 }
@@ -479,12 +484,12 @@ void rle_decode_block(VETORZIGZAG* zigzag_block, BLOCO_RLE_DIFERENCIAL* rle_bloc
         zigzag_block->vector[i] = 0.0f;
     }
 
-    zigzag_block->vector[0] = rle_block->coeficiente_dc;
+    zigzag_block->vector[0] = (float)rle_block->coeficiente_dc; // float pois a DCT retorna float
     int current_ac_idx = 1;
 
     for (int k = 0; k < rle_block->quantidade; k++) {
         const PAR_RLE* par_atual = &rle_block->pares[k];
-        if (par_atual->zeros == 0 && fabs(par_atual->valor) < 0.0001f) {
+        if (par_atual->zeros == 0 && par_atual->valor == 0) {
             break; // EOB encontrado
         }
 
@@ -497,7 +502,7 @@ void rle_decode_block(VETORZIGZAG* zigzag_block, BLOCO_RLE_DIFERENCIAL* rle_bloc
         }
 
         if (current_ac_idx <= 63) {
-            zigzag_block->vector[current_ac_idx] = par_atual->valor;
+            zigzag_block->vector[current_ac_idx] = (float)par_atual->valor; // float pois a DCT retorna float
             current_ac_idx++;
         } else {
             return;
@@ -529,24 +534,26 @@ void differential_encode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
     /*
      * Faz codificação diferencial dos coeficientes DC dos macroblocos.
      */
-    int previous_dc_Y[4] = {0}, previous_dc_Cb = 0, previous_dc_Cr = 0;
+    int previous_dc_Y = 0;
+    int previous_dc_Cb = 0;
+    int previous_dc_Cr = 0;
 
     for (int i = 0; i < macroblock_count; i++) {
+        // Processa os 4 blocos Y em sequência
         for (int j = 0; j < 4; j++) {
-            int current = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
-            int diff = current - previous_dc_Y[j];
-            rle_macroblocks[i].Y_vetor[j].coeficiente_dc = diff;
-            previous_dc_Y[j] = current;
+            int current_dc = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
+            rle_macroblocks[i].Y_vetor[j].coeficiente_dc = current_dc - previous_dc_Y;
+            previous_dc_Y = current_dc; // O preditor para o próximo Y é o Y atual
         }
 
+        // Processa o bloco Cb
         int current_Cb = rle_macroblocks[i].Cb_vetor.coeficiente_dc;
-        int diff_Cb = current_Cb - previous_dc_Cb;
-        rle_macroblocks[i].Cb_vetor.coeficiente_dc = diff_Cb;
+        rle_macroblocks[i].Cb_vetor.coeficiente_dc = current_Cb - previous_dc_Cb;
         previous_dc_Cb = current_Cb;
 
+        // Processa o bloco Cr
         int current_Cr = rle_macroblocks[i].Cr_vetor.coeficiente_dc;
-        int diff_Cr = current_Cr - previous_dc_Cr;
-        rle_macroblocks[i].Cr_vetor.coeficiente_dc = diff_Cr;
+        rle_macroblocks[i].Cr_vetor.coeficiente_dc = current_Cr - previous_dc_Cr;
         previous_dc_Cr = current_Cr;
     }
 }
@@ -555,21 +562,26 @@ void differential_decode_dc(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
     /*
      * Faz decodificação diferencial dos coeficientes DC dos macroblocos.
      */
-    int previous_dc_Y[4] = {0}, previous_dc_Cb = 0, previous_dc_Cr = 0;
+    int previous_dc_Y = 0;
+    int previous_dc_Cb = 0;
+    int previous_dc_Cr = 0;
 
     for (int i = 0; i < macroblock_count; i++) {
+        // Decodifica os 4 blocos Y
         for (int j = 0; j < 4; j++) {
             int diff = rle_macroblocks[i].Y_vetor[j].coeficiente_dc;
-            int real_dc = previous_dc_Y[j] + diff;
+            int real_dc = previous_dc_Y + diff;
             rle_macroblocks[i].Y_vetor[j].coeficiente_dc = real_dc;
-            previous_dc_Y[j] = real_dc;
+            previous_dc_Y = real_dc; // O preditor para o próximo Y é o Y reconstruído
         }
 
+        // Decodifica o bloco Cb
         int diff_Cb = rle_macroblocks[i].Cb_vetor.coeficiente_dc;
         int real_Cb = previous_dc_Cb + diff_Cb;
         rle_macroblocks[i].Cb_vetor.coeficiente_dc = real_Cb;
         previous_dc_Cb = real_Cb;
 
+        // Decodifica o bloco Cr
         int diff_Cr = rle_macroblocks[i].Cr_vetor.coeficiente_dc;
         int real_Cr = previous_dc_Cr + diff_Cr;
         rle_macroblocks[i].Cr_vetor.coeficiente_dc = real_Cr;

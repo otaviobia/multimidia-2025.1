@@ -4,17 +4,25 @@
     #include <stdio.h>
     #include <stdint.h>
     #include "codec.h"
+    #include "bitmap.h"
 
     // Tamanho máximo do código Huffman no padrão JPEG (16 bits)
     #define MAX_HUFFMAN_CODE_LENGTH 16
     
+    // Estrutura para cabeçalho de arquivo BMP
+    typedef struct {
+        BITMAPFILEHEADER file_header;
+        BITMAPINFOHEADER info_header;
+        int quality;
+        int macroblock_count;
+    } COMPRESSED_HEADER;
+
     // Estrutura para entrada da tabela Huffman
     typedef struct {
         char code[MAX_HUFFMAN_CODE_LENGTH + 1]; // Código binário como string
         int code_length;                        // Comprimento do código em bits
         int code_value;                    // Valor do código como inteiro
     } HuffmanEntry;
-
 
     // Estrutura para estatísticas de símbolos
     typedef struct {
@@ -45,14 +53,16 @@
 
     // Funções de decodificação Huffman
     int decode_dc_huffman(BitBuffer* buffer);
-    int decode_dc_coefficient(BitBuffer* buffer);
+    int decode_dc_coefficient(int* result_val, BitBuffer* buffer);
     int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category);
     int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value);
     int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block);
-    MACROBLOCO_RLE_DIFERENCIAL* huffman_decode_macroblock(BitBuffer* buffer);
+    int huffman_decode_macroblock(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* dest_macroblock);
 
-    // Tabela DC - Fornecida
-    static const HuffmanEntry JPEG_DC_LUMINANCE_TABLE[11] = {
+    // Funções de leitura e escrita de macroblocos
+    void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, int quality);
+    int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, int *quality_lida);    // Tabela DC - Fornecida (expandida com categorias 11 e 12)
+    static const HuffmanEntry JPEG_DC_LUMINANCE_TABLE[13] = {
         // binario  | comprimento | valor(binario em hexadecimal)
         // Qtd. bits da mantissa é o mesmo da categoria
         // (linha) - (categoria)
@@ -67,7 +77,9 @@
         {"11110", 5, 0x1E},       // Categoria 7
         {"111110", 6, 0x3E},      // Categoria 8
         {"1111110", 7, 0x7E},     // Categoria 9
-        {"11111110", 8, 0xFE}     // Categoria A
+        {"11111110", 8, 0xFE},    // Categoria A (10)
+        {"111111110", 9, 0x1FE},  // Categoria B (11)
+        {"1111111110", 10, 0x3FE} // Categoria C (12)
     };
     
     // Tabela AC - Fornecida
@@ -182,7 +194,7 @@
     {
         {"", 0, 0x0}, // (8,0)
         {"11111010", 8, 0xFA}, // (8,1)
-        {"1111111110000000", 16, 0xFFC0}, // (8,2)
+        {"1111111110000000", 16, 0xFF80}, // (8,2)
         {"1111111110110111", 16, 0xFFB7}, // (8,3)
         {"1111111110111000", 16, 0xFFB8}, // (8,4)
         {"1111111110111001", 16, 0xFFB9}, // (8,5)

@@ -576,7 +576,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int ac_value = (int)round(par->valor);
             
             // Verifica se e EOB
-            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+            if (par->zeros == 0 && par->valor == 0) {
                 printf("    AC[%d]: EOB (End of Block)\n", k);
                 break;
             }
@@ -585,7 +585,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int code = get_coefficient_code(ac_value, category);
             int decoded = decode_coefficient_from_category(category, code);
             
-            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+            printf("    AC[%d]: zeros=%d, valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
                    k, par->zeros, par->valor, category, code, decoded,
                    (ac_value == decoded) ? "Y" : "X");
             
@@ -609,7 +609,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int ac_value = (int)round(par->valor);
             
             // Verifica se e EOB
-            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+            if (par->zeros == 0 && par->valor == 0) {
                 printf("    AC[%d]: EOB (End of Block)\n", k);
                 break;
             }
@@ -618,7 +618,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int code = get_coefficient_code(ac_value, category);
             int decoded = decode_coefficient_from_category(category, code);
             
-            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+            printf("    AC[%d]: zeros=%d, valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
                    k, par->zeros, par->valor, category, code, decoded,
                    (ac_value == decoded) ? "Y" : "X");
             
@@ -642,7 +642,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int ac_value = (int)round(par->valor);
             
             // Verifica se e EOB
-            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+            if (par->zeros == 0 && par->valor == 0) {
                 printf("    AC[%d]: EOB (End of Block)\n", k);
                 break;
             }
@@ -651,7 +651,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int code = get_coefficient_code(ac_value, category);
             int decoded = decode_coefficient_from_category(category, code);
             
-            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+            printf("    AC[%d]: zeros=%d, valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
                    k, par->zeros, par->valor, category, code, decoded,
                    (ac_value == decoded) ? "Y" : "X");
             
@@ -1026,11 +1026,12 @@ void testHuffmanRoundtrip() {
         buffer->byte_position = 0;
         buffer->bit_position = 0;
         
-        // Decodifica a diferença DC
-        int decoded_dc = decode_dc_coefficient(buffer);
+        // Decodifica a diferença DC usando a nova assinatura
+        int decoded_dc;
+        int success = decode_dc_coefficient(&decoded_dc, buffer);
         
-        // Verifica se o valor decodificado é igual ao original
-        if (decoded_dc != dc_diffs[i]) {
+        // Verifica se a decodificação foi bem-sucedida e se o valor é igual ao original
+        if (!success || decoded_dc != dc_diffs[i]) {
             printf("ERRO DC: Original=%d, Decodificado=%d\n", dc_diffs[i], decoded_dc);
             errors_dc++;
         }
@@ -1123,4 +1124,23 @@ void testHuffmanRoundtrip() {
     
     free_bit_buffer(buffer);
     printf("********************************************\n\n");
+}
+
+long fsize(const char *filename)
+{
+    /*
+     * Retorna o tamanho do arquivo em bytes.
+     * 
+     * Parâmetros:
+     * filename: caminho do arquivo
+     */
+    FILE *fp = fopen(filename, "rb");
+    if (!fp) {
+        perror("Erro ao abrir arquivo");
+        return -1;  // Retorna -1 em caso de erro
+    }
+    long size;
+    fseek(fp, 0, SEEK_END);
+    size = ftell(fp);
+    return size;
 }
