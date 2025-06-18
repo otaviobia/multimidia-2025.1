@@ -532,12 +532,19 @@ int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     while (pos < 63) { // Máximo de 63 coeficientes AC
         int run_length, value;
         int result = decode_ac_coefficient(buffer, &run_length, &value);
-        
-        if (result == 0) return 0; // Erro
-        if (result == 2) break; // EOB
-        
-        // Para ZRL, apenas avançamos a posição
+          if (result == 0) return 0; // Erro
+        if (result == 2) {
+            // EOB encontrado - adiciona o marcador [0,0] ao bloco antes de sair
+            block->pares[block->quantidade].zeros = 0;
+            block->pares[block->quantidade].valor = 0;
+            block->quantidade++;
+            break;
+        }
+          // Para ZRL, adiciona o marcador [15,0] ao bloco e avança a posição
         if (result == 3) {
+            block->pares[block->quantidade].zeros = 15;
+            block->pares[block->quantidade].valor = 0;
+            block->quantidade++;
             pos += 16;
             continue;
         }
