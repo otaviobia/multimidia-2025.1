@@ -64,7 +64,7 @@ void forwardDCT(float block[8][8], float Dctfrequencies[8][8]) {
                     sum += block[x][y]*cosTable[i][x]*cosTable[j][y];
                 }
             }
-            Dctfrequencies[i][j] = C[i]*C[j]*sum/4.0;
+            Dctfrequencies[i][j] = (float)round(C[i]*C[j]*sum/4.0);
         }
     }
 }
@@ -94,7 +94,7 @@ void inverseDCT(float Dctfrequencies[8][8], float block[8][8]) {
                     sum += C[i]*C[j]*Dctfrequencies[i][j]*cosTable[i][x]*cosTable[j][y];
                 }
             }
-            block[x][y] = sum/4.0;
+            block[x][y] = (float)round(sum/4.0);
         }
     }
 }

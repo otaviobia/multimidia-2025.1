@@ -267,10 +267,10 @@ int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     // Codifica os pares AC (zeros, valor)
     for (int i = 0; i < block->quantidade; i++) {
         int zeros = block->pares[i].zeros;
-        int valor = (int)round(block->pares[i].valor);
+        int valor = block->pares[i].valor;
         
         // Se temos o par (0,0), é um EOB
-        if (block->pares[i].zeros == 0 && block->pares[i].valor == 0.0f) {
+        if (block->pares[i].zeros == 0 && block->pares[i].valor == 0) {
             if (!write_ac_coefficient(buffer, 0, 0)) {
                 printf("Erro ao codificar EOB\n");
                 return 0;
@@ -288,7 +288,7 @@ int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     // Se não terminou com EOB explícito, adiciona um
     if (block->quantidade == 0 || 
         !(block->pares[block->quantidade-1].zeros == 0 && 
-          block->pares[block->quantidade-1].valor == 0.0f)) {
+          block->pares[block->quantidade-1].valor == 0)) {
         if (!write_ac_coefficient(buffer, 0, 0)) {
             printf("Erro ao adicionar EOB final\n");
             return 0;
@@ -548,7 +548,7 @@ int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
         
         // Adiciona o par (run_length, value) ao bloco
         block->pares[block->quantidade].zeros = run_length;
-        block->pares[block->quantidade].valor = (float)value;
+        block->pares[block->quantidade].valor = value;
         block->quantidade++;
     }
     

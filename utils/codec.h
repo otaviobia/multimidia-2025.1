@@ -26,7 +26,7 @@
     // Estrutura que representa um par do Run-length Encoding
     typedef struct {
         int zeros; // Número de zeros antes do coeficiente não-zero
-        float valor;    // Valor do coeficiente não-zero (ou 0.0 para representar EOB)
+        int valor;    // Valor do coeficiente não-zero (ou 0 para representar EOB)
     } PAR_RLE;
 
     typedef struct {

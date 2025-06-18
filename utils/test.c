@@ -576,7 +576,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int ac_value = (int)round(par->valor);
             
             // Verifica se e EOB
-            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+            if (par->zeros == 0 && par->valor == 0) {
                 printf("    AC[%d]: EOB (End of Block)\n", k);
                 break;
             }
@@ -585,7 +585,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int code = get_coefficient_code(ac_value, category);
             int decoded = decode_coefficient_from_category(category, code);
             
-            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+            printf("    AC[%d]: zeros=%d, valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
                    k, par->zeros, par->valor, category, code, decoded,
                    (ac_value == decoded) ? "Y" : "X");
             
@@ -609,7 +609,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int ac_value = (int)round(par->valor);
             
             // Verifica se e EOB
-            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+            if (par->zeros == 0 && par->valor == 0) {
                 printf("    AC[%d]: EOB (End of Block)\n", k);
                 break;
             }
@@ -618,7 +618,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int code = get_coefficient_code(ac_value, category);
             int decoded = decode_coefficient_from_category(category, code);
             
-            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+            printf("    AC[%d]: zeros=%d, valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
                    k, par->zeros, par->valor, category, code, decoded,
                    (ac_value == decoded) ? "Y" : "X");
             
@@ -642,7 +642,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int ac_value = (int)round(par->valor);
             
             // Verifica se e EOB
-            if (par->zeros == 0 && fabs(par->valor) < 0.0001f) {
+            if (par->zeros == 0 && par->valor == 0) {
                 printf("    AC[%d]: EOB (End of Block)\n", k);
                 break;
             }
@@ -651,7 +651,7 @@ void testACCategoryEncoding(MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int mac
             int code = get_coefficient_code(ac_value, category);
             int decoded = decode_coefficient_from_category(category, code);
             
-            printf("    AC[%d]: zeros=%d, valor=%.1f, categoria=%d, codigo=%d, decodificado=%d %s\n", 
+            printf("    AC[%d]: zeros=%d, valor=%d, categoria=%d, codigo=%d, decodificado=%d %s\n", 
                    k, par->zeros, par->valor, category, code, decoded,
                    (ac_value == decoded) ? "Y" : "X");
             

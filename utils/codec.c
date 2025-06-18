@@ -211,8 +211,8 @@ void dequantizeBlock(float block[8][8], int quantization_matrix[8][8]) {
      */
     for (int y = 0; y < 8; y++) {
         for (int x = 0; x < 8; x++) {
-            // Aplica a dequantização
-            block[y][x] *= quantization_matrix[y][x];
+            // Aplica a dequantização com arredondamento para melhor precisão
+            block[y][x] = roundf(block[y][x] * quantization_matrix[y][x]);
         }
     }
 }
@@ -259,7 +259,7 @@ void quantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int quality
      * compression_factor: fator de compressão
      */
     int quantization_matrix_y[8][8], quantization_matrix_chroma[8][8];
-    int scale_factor = quality < 50 ? 5000 / quality : 200 - quality*2;
+    int scale_factor = quality < 50 ? (int)round(5000.0 / quality) : 200 - quality*2;
 
     // Preenche as matrizes de quantização com os valores base multiplicados pelo fator de compressão
     for (int i = 0; i < 8; i++) {
@@ -285,7 +285,7 @@ void dequantizeMacroblocks(MACROBLOCO *mb_array, int macroblock_count, int quali
      * compression_factor: fator de compressão
      */
     int quantization_matrix_y[8][8], quantization_matrix_chroma[8][8];
-    int scale_factor = quality < 50 ? 5000 / quality : 200 - quality*2;
+    int scale_factor = quality < 50 ? (int)round(5000.0 / quality) : 200 - quality*2;
 
     // Preenche as matrizes de quantização com os valores base multiplicados pelo fator de compressão
     for (int i = 0; i < 8; i++) {
@@ -431,15 +431,16 @@ void rle_encode_block(BLOCO_RLE_DIFERENCIAL* rle_block, VETORZIGZAG* zigzag_bloc
     rle_block->quantidade = 0;
     int quantidade_zeros = 0;
 
-    rle_block->coeficiente_dc = zigzag_block->vector[0];
+    rle_block->coeficiente_dc = (int)round(zigzag_block->vector[0]);
 
     for (int i = 1; i <= 63; i++) {
-        if (fabs(zigzag_block->vector[i]) < 0.0001f) {
+        int valor_quantizado = (int)round(zigzag_block->vector[i]);
+        if (valor_quantizado == 0) {
             quantidade_zeros++;
         } else {
             if (rle_block->quantidade < 63) {
                  rle_block->pares[rle_block->quantidade].zeros = quantidade_zeros;
-                 rle_block->pares[rle_block->quantidade].valor = zigzag_block->vector[i];
+                 rle_block->pares[rle_block->quantidade].valor = valor_quantizado;
                  rle_block->quantidade++;
                  quantidade_zeros = 0;
             } else {
@@ -450,7 +451,7 @@ void rle_encode_block(BLOCO_RLE_DIFERENCIAL* rle_block, VETORZIGZAG* zigzag_bloc
     // Colocar EOB
     if (rle_block->quantidade < 64) {
         rle_block->pares[rle_block->quantidade].zeros = 0;
-        rle_block->pares[rle_block->quantidade].valor = 0.0f;
+        rle_block->pares[rle_block->quantidade].valor = 0;
         rle_block->quantidade++;
     }
 }
@@ -483,12 +484,12 @@ void rle_decode_block(VETORZIGZAG* zigzag_block, BLOCO_RLE_DIFERENCIAL* rle_bloc
         zigzag_block->vector[i] = 0.0f;
     }
 
-    zigzag_block->vector[0] = rle_block->coeficiente_dc;
+    zigzag_block->vector[0] = (float)rle_block->coeficiente_dc; // float pois a DCT retorna float
     int current_ac_idx = 1;
 
     for (int k = 0; k < rle_block->quantidade; k++) {
         const PAR_RLE* par_atual = &rle_block->pares[k];
-        if (par_atual->zeros == 0 && fabs(par_atual->valor) < 0.0001f) {
+        if (par_atual->zeros == 0 && par_atual->valor == 0) {
             break; // EOB encontrado
         }
 
@@ -501,7 +502,7 @@ void rle_decode_block(VETORZIGZAG* zigzag_block, BLOCO_RLE_DIFERENCIAL* rle_bloc
         }
 
         if (current_ac_idx <= 63) {
-            zigzag_block->vector[current_ac_idx] = par_atual->valor;
+            zigzag_block->vector[current_ac_idx] = (float)par_atual->valor; // float pois a DCT retorna float
             current_ac_idx++;
         } else {
             return;
