@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
         fclose(input_file);
         return 1;
     }
-    readPixels(input_file, info_header, pixels_rgb);
+    readPixels(input_file, info_header, file_header, pixels_rgb);
     fclose(input_file); // Fecha o arquivo BMP após leituras finalizadas
 
     // 3. Converte os pixels RGB para YCbCr
@@ -102,7 +102,17 @@ int main(int argc, char *argv[]) {
     write_macroblocks_huffman(output_filename, rle_diff_macroblocks, macroblock_count, file_header, info_header, quality);
 
     printf("Imagem comprimida com sucesso para %s\n", output_filename);
-    printf("O arquivo comprimido eh %.2f%% menor que a imagem original.\n", (1.0f - (float)fsize(output_filename) / fsize(input_filename)) * 100.0f);
+
+    // Pega o tamanho do arquivo original e comprimido usando a função fsize()
+    long original_size = fsize(input_filename);
+    long compressed_size = fsize(output_filename);
+
+    // Calcula e imprime a taxa de compressão
+    if (compressed_size > 0 && original_size > 0) {
+        float ratio = (float)original_size / compressed_size;
+        float reduction_percentage = (1.0f - (float)compressed_size / original_size) * 100.0f;
+        printf("Taxa de compressao aproximada: 1:%.2f (%.2f%% menor)\n", ratio, reduction_percentage);
+    }
 
     // 9. Limpa a memória alocada
     free(pixels_rgb);

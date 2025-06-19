@@ -45,6 +45,11 @@
     int read_bits(BitBuffer* buffer, int num_bits);
     size_t get_huffman_buffer_size(BitBuffer* buffer);
 
+    // Funções auxiliares do Huffman
+    int get_coefficient_category(int value);
+    int get_coefficient_code(int value, int category);
+    int decode_coefficient_from_category(int category, int code);
+
     // Funções de codificação Huffman
     int write_dc_coefficient(BitBuffer* buffer, int dc_diff);
     int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value);

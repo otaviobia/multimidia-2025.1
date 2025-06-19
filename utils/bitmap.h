@@ -40,7 +40,7 @@
     void loadBMPHeaders (FILE *fp, BITMAPFILEHEADER *FileHeader, BITMAPINFOHEADER *InfoHeader);
     void readInfoHeader(FILE *F, BITMAPINFOHEADER *INFO_H);
     void readHeader(FILE *F, BITMAPFILEHEADER *H);
-    void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image);
+    void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, BITMAPFILEHEADER FileHeader, PIXELRGB *Image);
     void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader);
     void writeHeaders(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader);
     void writeBMP(FILE *output, BITMAPFILEHEADER FileHeader, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image);

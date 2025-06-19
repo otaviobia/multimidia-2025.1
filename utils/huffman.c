@@ -1,3 +1,5 @@
+/* Esse arquivo é responsável por implementar a codificação de Huffman e manipulação de buffers de bits. 
+*/
 #include "huffman.h"
 #include "codec.h"
 #include <stdlib.h>
@@ -5,8 +7,13 @@
 #include <string.h>
 #include <math.h>
 
-// Inicializa um buffer de bits
 BitBuffer* init_bit_buffer(size_t initial_capacity) {
+    /* Inicializa um buffer de bits com uma capacidade inicial.
+     * Retorna um ponteiro para o buffer ou NULL em caso de erro.
+     *
+     * Parâmetros:
+     * initial_capacity: capacidade inicial do buffer em bytes
+    */
     BitBuffer* buffer = (BitBuffer*)calloc(1, sizeof(BitBuffer));
     if (!buffer) return NULL; // erro em alocar memória
     
@@ -23,16 +30,29 @@ BitBuffer* init_bit_buffer(size_t initial_capacity) {
     return buffer;
 }
 
-// Libera um buffer de bits
 void free_bit_buffer(BitBuffer* buffer) {
+    /* Libera a memória alocada para o buffer de bits.
+     * Se o buffer for NULL, não faz nada.
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer a ser liberado
+    */
     if (buffer) {
         if (buffer->data) free(buffer->data);
         free(buffer); // libera a estrutura do buffer
     }
 }
 
-// Garante que o buffer tem capacidade suficiente
 static int ensure_capacity(BitBuffer* buffer, size_t additional_bits) {
+    /* Garante que o buffer tem espaço suficiente para escrever mais bits.
+     * Se necessário, aumenta a capacidade do buffer.
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits
+     * additional_bits: número de bits adicionais que serão escritos
+     *
+     * Retorna 1 se o espaço foi garantido, 0 em caso de erro.
+    */
     size_t required_bytes = buffer->byte_position + 
                            (buffer->bit_position + additional_bits + 7) / 8;
                            
@@ -53,8 +73,17 @@ static int ensure_capacity(BitBuffer* buffer, size_t additional_bits) {
     return 1;
 }
 
-// Escreve bits no buffer
 int write_bits(BitBuffer* buffer, int value, int num_bits) {
+    /* Escreve um valor de bits no buffer, começando pelo bit mais significativo (MSB).
+     * Se o buffer não tiver espaço suficiente, aumenta a capacidade.
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits
+     * value: valor a ser escrito (deve estar dentro do intervalo permitido)
+     * num_bits: número de bits a serem escritos
+     *
+     * Retorna 1 se a escrita foi bem-sucedida, 0 em caso de erro.
+    */
     if (!buffer || num_bits <= 0) return 0; // Parâmetros inválidos
     
     // Garante que ha espaço suficiente
@@ -113,8 +142,16 @@ int write_bits(BitBuffer* buffer, int value, int num_bits) {
     return 1;
 }
 
-// Escreve um coeficiente DC no buffer
 int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
+    /* Escreve um coeficiente DC no buffer usando codificação Huffman.
+     * O coeficiente é a diferença entre o valor atual e o valor anterior.
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits
+     * dc_diff: diferença do coeficiente DC a ser escrito
+     *
+     * Retorna 1 se a escrita foi bem-sucedida, 0 em caso de erro.
+    */
     // Clamp DC value to category 12 range if it exceeds it
     int original_dc = dc_diff;
     if (dc_diff > 4095) {
@@ -158,8 +195,17 @@ int write_dc_coefficient(BitBuffer* buffer, int dc_diff) {
     return 1;
 }
 
-// Escreve um coeficiente AC no buffer
 int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
+    /* Escreve um coeficiente AC no buffer usando codificação Huffman.
+     * O coeficiente é representado por um par (run_length, ac_value).
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits
+     * run_length: número de zeros antes do valor AC
+     * ac_value: valor do coeficiente AC a ser escrito
+     *
+     * Retorna 1 se a escrita foi bem-sucedida, 0 em caso de erro.
+    */
     // EOB - End of Block (0,0)
     if (run_length == 0 && ac_value == 0) {
         const HuffmanEntry* entry = &JPEG_AC_LUMINANCE_MATRIX[0][0];
@@ -256,8 +302,16 @@ int write_ac_coefficient(BitBuffer* buffer, int run_length, int ac_value) {
     return 1;
 }
 
-// Codifica um bloco RLE usando Huffman
 int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
+    /* Codifica um bloco RLE diferencial usando Huffman.
+     * Codifica o coeficiente DC e os pares AC (zeros, valor).
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits onde os dados serão escritos
+     * block: ponteiro para o bloco a ser codificado
+     *
+     * Retorna 1 se a codificação foi bem-sucedida, 0 em caso de erro.
+    */
     // Codifica o coeficiente DC
     if (!write_dc_coefficient(buffer, block->coeficiente_dc)) {
         printf("Erro ao codificar DC: %d\n", block->coeficiente_dc);
@@ -298,8 +352,16 @@ int huffman_encode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     return 1;
 }
 
-// Codifica um macrobloco completo
 BitBuffer* huffman_encode_macroblock(MACROBLOCO_RLE_DIFERENCIAL* macroblock) {
+    /* Codifica um macrobloco RLE diferencial usando Huffman.
+     * Codifica os blocos Y (luminância) e os blocos Cb e Cr (crominância).
+     *
+     * Parâmetros:
+     * macroblock: ponteiro para o macrobloco a ser codificado
+     *
+     * Retorna um ponteiro para o buffer de bits contendo os dados codificados,
+     * ou NULL em caso de erro.
+    */
     // Inicializa o buffer com um tamanho razoável
     BitBuffer* buffer = init_bit_buffer(1024);
     if (!buffer) return NULL;
@@ -330,14 +392,25 @@ BitBuffer* huffman_encode_macroblock(MACROBLOCO_RLE_DIFERENCIAL* macroblock) {
     return buffer;
 }
 
-// Função para obter o tamanho final do buffer comprimido em bytes
 size_t get_huffman_buffer_size(BitBuffer* buffer) {
+    /* Retorna o tamanho do buffer de bits em bytes.
+     * Se o buffer for NULL, retorna 0.
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits
+    */
     if (!buffer) return 0;
     return buffer->byte_position + (buffer->bit_position > 0 ? 1 : 0);
 }
 
-// Lê bits do buffer
 int read_bits(BitBuffer* buffer, int num_bits) {
+    /* Lê um número específico de bits do buffer de bits.
+     * Retorna o valor lido ou -1 em caso de erro (como fim do buffer).
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits
+     * num_bits: número de bits a serem lidos
+    */
     if (!buffer || num_bits <= 0) return -1; // Erro de parâmetros
     
     int value = 0;
@@ -388,8 +461,13 @@ int read_bits(BitBuffer* buffer, int num_bits) {
     return value;
 }
 
-// Decodifica um símbolo Huffman - usando tabela DC
 int decode_dc_huffman(BitBuffer* buffer) {
+    /* Decodifica um código Huffman para um coeficiente DC.
+     * Retorna a categoria do coeficiente DC ou -1 em caso de erro.
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits onde os dados serão lidos
+    */
     int bits_read = 0;
     int current_code = 0;
     
@@ -425,8 +503,16 @@ int decode_dc_huffman(BitBuffer* buffer) {
     return -1; // Código inválido - não encontrou nas tabelas ou excedeu comprimento máximo
 }
 
-// Decodifica um par AC (run, category)
 int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category) {
+    /* Decodifica um código Huffman para um coeficiente AC.
+     * Retorna 1 se encontrou um código válido, 0 se não encontrou,
+     * ou -1 em caso de erro.
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits onde os dados serão lidos
+     * run_length: ponteiro para armazenar o comprimento do run (número de zeros)
+     * category: ponteiro para armazenar a categoria do coeficiente AC
+    */
     int bits_read = 0;
     int current_code = 0;
     
@@ -465,8 +551,14 @@ int decode_ac_huffman(BitBuffer* buffer, int* run_length, int* category) {
     return 0; // Não encontrou
 }
 
-// Decodifica um coeficiente DC (o resultado pode ser negativo)
 int decode_dc_coefficient(int* result_val, BitBuffer* buffer) {
+    /* Decodifica um coeficiente DC a partir do buffer de bits.
+     * Retorna 1 se a decodificação foi bem-sucedida, 0 em caso de erro.
+     *
+     * Parâmetros:
+     * result_val: ponteiro para armazenar o valor decodificado
+     * buffer: ponteiro para o buffer de bits onde os dados serão lidos
+    */
     // Decodifica o símbolo Huffman para obter a categoria
     int category = decode_dc_huffman(buffer);
     if (category < 0) return 0; // Erro
@@ -486,8 +578,16 @@ int decode_dc_coefficient(int* result_val, BitBuffer* buffer) {
     return 1; // Sucesso
 }
 
-// Decodifica um coeficiente AC
 int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value) {
+    /* Decodifica um coeficiente AC a partir do buffer de bits.
+     * Retorna 1 se a decodificação foi bem-sucedida, 0 em caso de erro,
+     * 2 se encontrou EOB (End of Block), ou 3 se encontrou ZRL (Zero Run Length).
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits onde os dados serão lidos
+     * run_length: ponteiro para armazenar o comprimento do run (número de zeros)
+     * value: ponteiro para armazenar o valor do coeficiente AC decodificado
+    */
     int category;
     if (!decode_ac_huffman(buffer, run_length, &category)) {
         return 0; // Não encontrou código válido
@@ -519,8 +619,16 @@ int decode_ac_coefficient(BitBuffer* buffer, int* run_length, int* value) {
     return 1; // Sucesso
 }
 
-// Decodifica um bloco inteiro
 int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
+    /* Decodifica um bloco RLE diferencial usando Huffman.
+     * Decodifica o coeficiente DC e os pares AC (zeros, valor).
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits onde os dados serão lidos
+     * block: ponteiro para o bloco a ser decodificado
+     *
+     * Retorna 1 se a decodificação foi bem-sucedida, 0 em caso de erro.
+    */
     int dc;
     if (!decode_dc_coefficient(&dc, buffer)) return 0;
 
@@ -562,8 +670,16 @@ int huffman_decode_block(BitBuffer* buffer, BLOCO_RLE_DIFERENCIAL* block) {
     return 1;
 }
 
-// Decodifica um macrobloco completo
 int huffman_decode_macroblock(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* dest_macroblock) {
+    /* Decodifica um macrobloco RLE diferencial usando Huffman.
+     * Decodifica os blocos Y (luminância) e os blocos Cb e Cr (crominância).
+     *
+     * Parâmetros:
+     * buffer: ponteiro para o buffer de bits onde os dados serão lidos
+     * dest_macroblock: ponteiro para o macrobloco onde os dados decodificados serão armazenados
+     *
+     * Retorna 1 se a decodificação foi bem-sucedida, 0 em caso de erro.
+    */
     if (!dest_macroblock) return 0;
     
     // Decodifica os blocos Y (luminância)
@@ -580,8 +696,18 @@ int huffman_decode_macroblock(BitBuffer* buffer, MACROBLOCO_RLE_DIFERENCIAL* des
     return 1;
 }
 
-// Escreve macroblocos comprimidos usando Huffman em um arquivo binário
 void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFERENCIAL *rle_macroblocks, int macroblock_count, BITMAPFILEHEADER file_header, BITMAPINFOHEADER info_header, int quality) {
+    /* Escreve macroblocos RLE diferencial codificados com Huffman em um arquivo binário.
+     * O arquivo contém os headers do BMP, nossos headers e os dados comprimidos dos macroblocos.
+     *
+     * Parâmetros:
+     * output_filename: nome do arquivo de saída
+     * rle_macroblocks: ponteiro para o array de macroblocos a serem escritos
+     * macroblock_count: número de macroblocos a serem escritos
+     * file_header: header do arquivo BMP
+     * info_header: header de informações do BMP
+     * quality: qualidade da compressão (usada para identificar o tipo de compressão)
+    */
     // Abre o arquivo binário de saída
     FILE *output_file = fopen(output_filename, "wb");
     if (!output_file) {
@@ -615,9 +741,20 @@ void write_macroblocks_huffman(const char *output_filename, MACROBLOCO_RLE_DIFER
     fclose(output_file);
 }
 
-// Lê macroblocos comprimidos usando Huffman de um arquivo binário
-// Salva eles em estruturas MACROBLOCO_RLE_DIFERENCIAL
 int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENCIAL **blocos_lidos, int *count_lido, BITMAPFILEHEADER *fhead, BITMAPINFOHEADER *ihead, int *quality_lida) {
+    /* Lê macroblocos RLE diferencial codificados com Huffman de um arquivo binário.
+     * O arquivo contém os headers do BMP, nossos headers e os dados comprimidos dos macroblocos.
+     *
+     * Parâmetros:
+     * input_filename: nome do arquivo de entrada
+     * blocos_lidos: ponteiro para armazenar o array de macroblocos lidos
+     * count_lido: ponteiro para armazenar o número de macroblocos lidos
+     * fhead: ponteiro para o header do arquivo BMP
+     * ihead: ponteiro para o header de informações do BMP
+     * quality_lida: ponteiro para armazenar a qualidade da compressão lida
+     *
+     * Retorna 1 se a leitura foi bem-sucedida, 0 em caso de erro.
+    */
     // Abre o arquivo binário de entrada
     FILE *input_file = fopen(input_filename, "rb");
     if (!input_file) {
@@ -666,4 +803,90 @@ int read_macroblocks_huffman(const char *input_filename, MACROBLOCO_RLE_DIFERENC
 
     fclose(input_file);
     return 1;
+}
+
+int get_coefficient_category(int value) {
+    /* Determina a categoria de um coeficiente DC ou AC.
+     * Categoria 0: Valor 0
+     * Categoria 1: Valores -1, 1
+     * Categoria 2: Valores -3 a -2, 2 a 3
+     * Categoria 3: Valores -7 a -4, 4 a 7
+     * Categoria 4: Valores -15 a -8, 8 a 15
+     * Categoria 5: Valores -31 a -16, 16 a 31
+     * Categoria 6: Valores -63 a -32, 32 a 63
+     * Categoria 7: Valores -127 a -64, 64 a 127
+     * Categoria 8: Valores -255 a -128, 128 a 255
+     * Categoria 9: Valores -511 a -256, 256 a 511
+     * Categoria 10: Valores -1023 a -512, 512 a 1023
+     * Categoria 11: Valores -2047 a -1024, 1024 a 2047 (só para DC)
+     * 
+     * Parâmetros:
+     * value: Valor do coeficiente
+     *
+     * Retorna:
+     * Categoria do coeficiente (0 a 11)
+     */
+    if (value == 0) return 0;
+    
+    int abs_value = abs(value);
+    int category = 0;
+    int threshold = 1;
+    
+    while (abs_value >= threshold) { // Verifica se o valor absoluto é maior ou igual ao limite da categoria
+        category++;
+        threshold *= 2;
+    }
+    
+    return category;
+}
+
+int get_coefficient_code(int value, int category) {
+    /* Obtém o código dentro da categoria para um coeficiente.
+     * Para valores positivos, o código é o próprio valor.
+     * Para valores negativos, usa a representação complementar dentro da categoria.
+     *
+     * Parâmetros:
+     * value: Valor do coeficiente
+     * category: Categoria do coeficiente
+     *
+     * Retorna:
+     * Código do coeficiente dentro da categoria
+     */
+    if (value >= 0) {
+        return value;
+    } else {
+        // Para valores negativos, usa a representação complementar dentro da categoria.
+        // O código mapeia valores negativos para a primeira metade dos códigos da categoria.
+        // onde (1 << categoria) significa deslocar o bit 1 para a esquerda 'categoria' posições
+        // Categoria 1: valores -1, 1
+        // Para -1: -1 + (1 << 1) - 1 = -1 + 2 - 1 = 0
+        // Categoria 2: valores -3, -2, 2, 3
+        // Para -3: -3 + (1 << 2) - 1 = -3 + 4 - 1 = 0 ...
+        return value + (1 << category) - 1;
+    }
+}
+
+int decode_coefficient_from_category(int category, int code) {
+    /* Decodifica um coeficiente a partir de um código e sua categoria.
+     * Se a categoria for 0, retorna 0.
+     * Se o primeiro bit do código estiver ligado, retorna o código como está (valor positivo).
+     * Se o primeiro bit estiver desligado, calcula o complemento de 2^category - 1 - code (valor negativo).
+     *
+     * Parâmetros:
+     * category: Categoria do coeficiente
+     * code: Código do coeficiente
+     *
+     * Retorna:
+     * Valor decodificado do coeficiente
+     */
+    if (category == 0) return 0;
+    
+    // Verifica se o primeiro bit está ligado (valor positivo)
+    if ((code >> (category - 1)) & 1) {
+        return code; // Valor positivo, mantém como está
+    } else {
+        // Valor negativo
+        // O código é o complemento de 2^category - 1 - code
+        return -((1 << category) - 1 - code);
+    }
 }

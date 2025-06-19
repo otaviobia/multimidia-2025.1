@@ -1,3 +1,7 @@
+/* Esse arquivo contém funções para comparar imagens RGB pixel a pixel,
+ * blocos 8x8 de valores em ponto flutuante e resultados de DCT.
+ * As comparações são feitas para debugar a implementação.
+ */
 #include "test.h"
 
 void compareRGB(const PIXELRGB *orig, const PIXELRGB *recon, int tam) {

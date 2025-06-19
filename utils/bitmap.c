@@ -1,3 +1,7 @@
+/* Esse arquivo é responsável por ler e escrever cabeçalhos de arquivos BMP,
+ * ler pixels do arquivo BMP e armazená-los em uma estrutura de pixels.
+ * Também imprime os cabeçalhos lidos.
+ */
 #include <stdlib.h>
 #include "bitmap.h"
 
@@ -72,13 +76,13 @@ void printHeaders (BITMAPFILEHEADER *FileHeader,  BITMAPINFOHEADER *InfoHeader) 
     printf("Number of important colors: %d\n", InfoHeader->ImportantColours); 
 }
 
-void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, PIXELRGB *Image) {
+void readPixels(FILE *input, BITMAPINFOHEADER InfoHeader, BITMAPFILEHEADER FileHeader, PIXELRGB *Image) {
     /* 
      * Lê os pixels do arquivo BMP e armazena no vetor de pixels Image.
      * A imagem é lida em ordem BGR (azul, verde, vermelho).
      */    
-    fseek(input, 54, SEEK_SET); // pular o header (54 bytes)
-
+    fseek(input, FileHeader.OffBits, SEEK_SET); // pular o header
+    
     int tam = InfoHeader.Height * InfoHeader.Width;
     for (int i = 0; i < tam; i++) {
         Image[i].B = fgetc(input);

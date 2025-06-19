@@ -1,3 +1,6 @@
+/* Esse arquivo é responsável por implementar a Transformada Discreta de Cosseno (DCT) e sua inversa (IDCT).
+ * A DCT é usada para transformar blocos de pixels do domínio espacial para o domínio de frequência.
+ */ 
 #include "dct.h"
 #define M_PI 3.14159265358979323846
 
